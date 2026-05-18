@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CryptoPulse</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+<h1>Live BTC Prices</h1>
+
+<canvas id="chart"></canvas>
+
+<script>
+
+async function loadData() {
+
+    const response = await fetch("http://127.0.0.1:8000/prices");
+
+    const data = await response.json();
+
+    const labels = data.map((item, index) => index);
+
+    const prices = data.map(item => item.price);
+
+    new Chart(document.getElementById("chart"), {
+
+        type: "line",
+
+        data: {
+            labels: labels,
+
+            datasets: [{
+                label: "BTC Price",
+                data: prices
+            }]
+        }
+    });
+}
+
+loadData();
+
+</script>
+
+</body>
+</html>
