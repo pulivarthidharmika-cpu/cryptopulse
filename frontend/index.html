@@ -2,46 +2,84 @@
 <html>
 
 <head>
-    <title>CryptoPulse</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>CryptoPulse Dashboard</title>
+
+    <style>
+
+        body{
+            font-family: Arial;
+            background-color: #111827;
+            color: white;
+            text-align: center;
+            padding: 30px;
+        }
+
+        h1{
+            color: #38bdf8;
+        }
+
+        .card{
+            background: #1f2937;
+            margin: 20px auto;
+            padding: 20px;
+            width: 300px;
+            border-radius: 10px;
+        }
+
+    </style>
+
 </head>
 
 <body>
 
-<h1>Live BTC Prices</h1>
+    <h1>CryptoPulse Dashboard</h1>
 
-<canvas id="chart"></canvas>
+    <div class="card">
+        <h2>Bitcoin</h2>
+        <p id="bitcoin">Loading...</p>
+    </div>
 
-<script>
+    <div class="card">
+        <h2>Ethereum</h2>
+        <p id="ethereum">Loading...</p>
+    </div>
 
-async function loadData() {
+    <div class="card">
+        <h2>Solana</h2>
+        <p id="solana">Loading...</p>
+    </div>
 
-    const response = await fetch("http://127.0.0.1:8000/prices");
+    <script>
+    async function fetchPrices() {
+        try {
+            const response = await fetch("http://127.0.0.1:8000/prices");
+            const data = await response.json();
 
-    const data = await response.json();
+            const latest = data[data.length - 1];
 
-    const labels = data.map((item, index) => index);
+            document.getElementById("bitcoin").innerText =
+                "$ " + latest.prices.bitcoin.usd;
 
-    const prices = data.map(item => item.price);
+            document.getElementById("ethereum").innerText =
+                "$ " + latest.prices.ethereum.usd;
 
-    new Chart(document.getElementById("chart"), {
+            if (latest.prices.solana) {
+                document.getElementById("solana").innerText =
+                    "$ " + latest.prices.solana.usd;
+            } else {
+                document.getElementById("solana").innerText =
+                    "No Solana data yet";
+            }
 
-        type: "line",
-
-        data: {
-            labels: labels,
-
-            datasets: [{
-                label: "BTC Price",
-                data: prices
-            }]
+        } catch (error) {
+            console.log(error);
         }
-    });
-}
+    }
 
-loadData();
-
+    fetchPrices();
+    setInterval(fetchPrices, 30000);
 </script>
 
 </body>
+
 </html>
