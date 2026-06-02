@@ -1,35 +1,3 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from routers.crypto_routes import router as crypto_router
-
-app = FastAPI(
-    title="CryptoPulse API",
-    description="Backend API for Live Crypto Monitoring",
-    version="1.0.0"
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.get("/")
-async def home():
-    return {
-        "message": "CryptoPulse Running",
-        "database": "cryptopulse_db",
-        "collections": [
-            "live_prices",
-            "historical_prices",
-            "alerts"
-        ]
-    }
-
-app.include_router(crypto_router)
-
 from fastapi import APIRouter
 from database.database import (
     live_prices_collection,
@@ -37,30 +5,21 @@ from database.database import (
     alerts_collection
 )
 
-router = APIRouter(tags=["Crypto"])
+router = APIRouter()
+
 
 @router.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "message": "CryptoPulse Backend Running"
-    }
+    return {"status": "Backend is running successfully"}
 
 
 @router.get("/coins")
 async def get_coins():
-    return {
-        "coins": [
-            "bitcoin",
-            "ethereum",
-            "solana"
-        ]
-    }
+    return {"coins": ["bitcoin", "ethereum", "solana"]}
 
 
 @router.get("/latest-price")
 async def get_latest_prices():
-
     prices = []
 
     cursor = live_prices_collection.find({}, {"_id": 0})
@@ -76,7 +35,6 @@ async def get_latest_prices():
 
 @router.get("/history")
 async def get_history():
-
     history = []
 
     cursor = historical_prices_collection.find({}, {"_id": 0})
@@ -92,7 +50,6 @@ async def get_history():
 
 @router.get("/alerts")
 async def get_alerts():
-
     alerts = []
 
     cursor = alerts_collection.find({}, {"_id": 0})
