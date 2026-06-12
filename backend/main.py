@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers.crypto_routes import router as crypto_router
+
+from routers.price_routes import router as price_router
+from routers.analytics_routes import router as analytics_router
+from routers.alert_routes import router as alert_router
+from routers.auth_routes import router as auth_router
+from routers.admin_routes import router as admin_router
 
 app = FastAPI(
     title="CryptoPulse API",
@@ -16,6 +21,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def home():
     return {
@@ -28,79 +34,11 @@ async def home():
         ]
     }
 
-app.include_router(crypto_router)
 
-from fastapi import APIRouter
-from database.database import (
-    live_prices_collection,
-    historical_prices_collection,
-    alerts_collection
-)
+# Register Routers
+app.include_router(price_router)
+app.include_router(analytics_router)
+app.include_router(alert_router)
+app.include_router(auth_router)
+app.include_router(admin_router)
 
-router = APIRouter(tags=["Crypto"])
-
-@router.get("/health")
-async def health_check():
-    return {
-        "status": "healthy",
-        "message": "CryptoPulse Backend Running"
-    }
-
-
-@router.get("/coins")
-async def get_coins():
-    return {
-        "coins": [
-            "bitcoin",
-            "ethereum",
-            "solana"
-        ]
-    }
-
-
-@router.get("/latest-price")
-async def get_latest_prices():
-
-    prices = []
-
-    cursor = live_prices_collection.find({}, {"_id": 0})
-
-    async for document in cursor:
-        prices.append(document)
-
-    return {
-        "count": len(prices),
-        "data": prices
-    }
-
-
-@router.get("/history")
-async def get_history():
-
-    history = []
-
-    cursor = historical_prices_collection.find({}, {"_id": 0})
-
-    async for document in cursor:
-        history.append(document)
-
-    return {
-        "count": len(history),
-        "data": history
-    }
-
-
-@router.get("/alerts")
-async def get_alerts():
-
-    alerts = []
-
-    cursor = alerts_collection.find({}, {"_id": 0})
-
-    async for document in cursor:
-        alerts.append(document)
-
-    return {
-        "count": len(alerts),
-        "data": alerts
-    }
