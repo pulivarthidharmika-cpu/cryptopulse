@@ -8,10 +8,11 @@ from database.database import (
 from utils.logger import logger
 from config.settings import SUPPORTED_COINS, BITCOIN_ALERT_PRICE
 
-
+# Crypto Router
 router = APIRouter(tags=["Crypto"])
 
 
+# Health Check API
 @router.get("/health")
 async def health_check():
     logger.info("Health check endpoint called")
@@ -21,6 +22,7 @@ async def health_check():
     }
 
 
+# Get Supported Coins
 @router.get("/coins")
 async def get_coins():
     logger.info("Coins endpoint called")
@@ -29,16 +31,19 @@ async def get_coins():
     }
 
 
+# Get Latest Cryptocurrency Prices
 @router.get("/latest-price")
 async def get_latest_prices():
     try:
         prices = []
 
+        # Fetch Latest Prices from MongoDB
         cursor = live_prices_collection.find({}, {"_id": 0})
 
         async for document in cursor:
             prices.append(document)
 
+            # Generate Alert if Bitcoin Crosses Threshold
             if (
                 document.get("coin") == "bitcoin"
                 and document.get("price", 0) > BITCOIN_ALERT_PRICE
@@ -65,11 +70,13 @@ async def get_latest_prices():
         )
 
 
+# Get Historical Price Data
 @router.get("/history")
 async def get_history():
     try:
         history = []
 
+        # Fetch Historical Records
         cursor = historical_prices_collection.find({}, {"_id": 0})
 
         async for document in cursor:
@@ -90,11 +97,13 @@ async def get_history():
         )
 
 
+# Get All Alerts
 @router.get("/alerts")
 async def get_alerts():
     try:
         alerts = []
 
+        # Fetch Alerts from MongoDB
         cursor = alerts_collection.find({}, {"_id": 0})
 
         async for document in cursor:
@@ -115,11 +124,13 @@ async def get_alerts():
         )
 
 
+# Generate Basic Analytics
 @router.get("/analytics")
 async def get_analytics():
     try:
         records = []
 
+        # Fetch Historical Records
         cursor = historical_prices_collection.find({}, {"_id": 0})
 
         async for document in cursor:
@@ -127,7 +138,9 @@ async def get_analytics():
 
         analytics = {}
 
+        # Calculate Analytics for Each Coin
         for coin in SUPPORTED_COINS:
+
             prices = [
                 item["price"]
                 for item in records
