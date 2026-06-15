@@ -13,7 +13,8 @@ COINS = ["bitcoin", "ethereum", "solana"]
 
 PARAMS = {
     "ids": ",".join(COINS),
-    "vs_currencies": "usd"
+    "vs_currencies": "usd",
+    "include_24hr_vol": "true"
 }
 
 
@@ -26,34 +27,25 @@ async def fetch_and_store_prices():
 
         for coin in COINS:
             price = data[coin]["usd"]
+            volume = data[coin].get("usd_24h_vol", 0)
 
             price_record = {
                 "coin": coin,
                 "price": price,
+                "volume": volume,
                 "currency": "usd",
                 "timestamp": timestamp
             }
 
-            # Store every record in historical_prices
-            await historical_prices_collection.insert_one(
-                price_record.copy()
-            )
+            await historical_prices_collection.insert_one(price_record.copy())
 
-            # Store only latest record in live_prices
             await live_prices_collection.update_one(
                 {"coin": coin},
-                {
-                    "$set": {
-                        "coin": coin,
-                        "price": price,
-                        "currency": "usd",
-                        "timestamp": timestamp
-                    }
-                },
+                {"$set": price_record},
                 upsert=True
             )
 
-        print("Prices stored successfully")
+        print("Prices and volume stored successfully")
 
     except Exception as e:
         print("Error fetching prices:", e)
@@ -62,9 +54,10 @@ async def fetch_and_store_prices():
 async def main():
     while True:
         await fetch_and_store_prices()
-        await asyncio.sleep(30)   # Fetch every 30 seconds
+        await asyncio.sleep(30)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
     

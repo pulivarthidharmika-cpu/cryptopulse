@@ -15,3 +15,16 @@
 2026-06-12 10:54:58,910 - INFO - Historical prices fetched successfully
 2026-06-12 10:55:12,384 - INFO - Analytics calculated successfully
 2026-06-12 10:55:34,883 - INFO - Alerts fetched successfully
+2026-06-12 15:22:28,543 - INFO - Advanced analytics calculated successfully
+2026-06-12 15:41:53,562 - INFO - Advanced analytics with volume calculated successfully
+2026-06-15 10:37:19,669 - INFO - Historical prices fetched successfully
+2026-06-15 10:38:10,010 - INFO - Advanced analytics with volume calculated successfully
+2026-06-15 10:44:46,727 - INFO - Latest prices fetched successfully
+2026-06-15 10:45:07,238 - INFO - Historical prices fetched successfully
+2026-06-15 10:45:23,321 - INFO - Advanced analytics with volume calculated successfully
+2026-06-15 10:45:33,447 - INFO - Alerts fetched successfully
+2026-06-15 11:00:03,512 - INFO - Latest prices fetched successfully
+2026-06-15 11:05:24,472 - INFO - Alert created successfully
+2026-06-15 11:12:47,982 - INFO - Alerts fetched successfully
+2026-06-15 11:15:12,611 - INFO - Alert updated successfully
+2026-06-15 11:16:07,509 - INFO - Alert deleted successfully
