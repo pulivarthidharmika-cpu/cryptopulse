@@ -19,7 +19,28 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "crypto-prices")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-SUPPORTED_COINS = ["bitcoin", "ethereum", "solana"]
-CURRENCY = "usd"
-BITCOIN_ALERT_PRICE = 70000
+SUPPORTED_COINS = os.getenv(
+    "SUPPORTED_COINS",
+    "bitcoin,ethereum,solana"
+).split(",")
 
+CURRENCY = os.getenv("CURRENCY", "usd")
+
+BITCOIN_ALERT_PRICE = float(
+    os.getenv("BITCOIN_ALERT_PRICE", 70000)
+)
+
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "cryptopulse_secret_key_2026"
+)
+
+ALGORITHM = os.getenv(
+    "ALGORITHM",
+    "HS256"
+)
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30)
+)

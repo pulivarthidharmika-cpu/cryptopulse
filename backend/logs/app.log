@@ -28,3 +28,96 @@
 2026-06-15 11:12:47,982 - INFO - Alerts fetched successfully
 2026-06-15 11:15:12,611 - INFO - Alert updated successfully
 2026-06-15 11:16:07,509 - INFO - Alert deleted successfully
+2026-06-16 10:31:50,777 - INFO - CryptoPulse API Started
+2026-06-16 10:32:57,416 - INFO - Alert created successfully
+2026-06-16 10:33:30,220 - INFO - Alert updated successfully
+2026-06-16 10:33:47,345 - INFO - Alerts fetched successfully
+2026-06-16 10:34:08,309 - INFO - Alert deleted successfully
+2026-06-16 10:36:47,505 - INFO - CryptoPulse API Started
+2026-06-16 10:42:51,069 - INFO - CryptoPulse API Started
+2026-06-16 10:42:52,947 - INFO - CryptoPulse API Started
+2026-06-16 10:48:42,405 - INFO - CryptoPulse API Started
+2026-06-16 10:50:36,701 - INFO - Prices, volume and market cap stored successfully
+2026-06-16 10:51:08,586 - INFO - Prices, volume and market cap stored successfully
+2026-06-16 10:51:39,933 - INFO - Prices, volume and market cap stored successfully
+2026-06-16 10:55:20,688 - INFO - CryptoPulse API Started
+2026-06-16 10:56:54,022 - INFO - CryptoPulse API Started
+2026-06-16 10:57:18,723 - INFO - Advanced analytics with volume and market cap calculated successfully
+2026-06-16 10:59:35,942 - INFO - CryptoPulse API Started
+2026-06-16 11:27:08,993 - INFO - CryptoPulse API Started
+2026-06-16 11:31:24,370 - INFO - User registered successfully: sayee@gmail.com
+2026-06-16 11:33:57,881 - ERROR - Login failed: 'hashed_password'
+2026-06-16 11:37:17,419 - INFO - CryptoPulse API Started
+2026-06-16 14:16:13,086 - INFO - CryptoPulse API Started
+2026-06-16 14:26:50,547 - INFO - User registered successfully: dharmika@gmail.com
+2026-06-16 14:27:34,002 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-16 14:30:23,128 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-16 14:34:59,109 - INFO - CryptoPulse API Started
+2026-06-16 15:01:33,335 - INFO - CryptoPulse API Started
+2026-06-16 15:04:43,617 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-16 15:11:05,013 - INFO - CryptoPulse API Started
+2026-06-16 15:13:44,339 - INFO - CryptoPulse API Started
+2026-06-16 15:28:20,953 - INFO - Alerts fetched successfully
+2026-06-16 15:28:40,388 - INFO - Advanced analytics with volume and market cap calculated successfully
+2026-06-16 15:30:22,094 - INFO - User registered successfully: badhurammulya@example.com
+2026-06-19 11:00:33,090 - INFO - CryptoPulse API Started
+2026-06-19 11:02:28,752 - ERROR - Signup failed: 'UserSignup' object has no attribute 'role'
+2026-06-19 11:05:00,691 - INFO - CryptoPulse API Started
+2026-06-19 11:06:25,331 - ERROR - Signup failed: 'UserSignup' object has no attribute 'role'
+2026-06-19 11:16:00,836 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-19 12:06:27,205 - INFO - CryptoPulse API Started
+2026-06-19 12:15:43,869 - ERROR - Signup failed: 'UserSignup' object has no attribute 'role'
+2026-06-20 10:57:50,833 - INFO - CryptoPulse API Started
+2026-06-20 10:58:40,747 - INFO - User registered successfully: dharmika@gmail.com
+2026-06-20 11:17:10,974 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-20 12:06:24,224 - INFO - Alerts fetched successfully
+2026-06-20 12:07:40,401 - INFO - Alert updated successfully
+2026-06-20 12:08:24,539 - INFO - Alert deleted successfully
+2026-06-20 12:09:05,172 - INFO - Alerts fetched successfully
+2026-06-20 12:09:06,560 - INFO - Alerts fetched successfully
+2026-06-20 12:09:10,487 - INFO - Alerts fetched successfully
+2026-06-20 15:12:37,642 - INFO - CryptoPulse API Started
+2026-06-20 15:13:36,049 - INFO - Health check endpoint called
+2026-06-20 15:14:11,563 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-20 15:15:40,402 - INFO - CryptoPulse API Started
+2026-06-20 15:17:05,662 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-20 15:42:12,834 - INFO - CryptoPulse API Started
+2026-06-20 15:43:25,957 - INFO - CryptoPulse API Started
+2026-06-20 15:52:33,530 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-20 16:04:25,089 - INFO - CryptoPulse API Started
+2026-06-20 16:05:56,954 - INFO - CryptoPulse API Started
+2026-06-20 16:08:04,315 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-20 16:10:36,711 - INFO - User logged in successfully: dharmika@gmail.com
+2026-06-22 10:18:11,757 - INFO - CryptoPulse API Started
+2026-06-22 10:18:38,414 - INFO - Latest prices fetched successfully
+2026-06-22 10:20:41,288 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:21:12,100 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:21:42,795 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:22:13,246 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:22:45,391 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:23:16,413 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:23:47,750 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:24:18,564 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:24:49,485 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:25:19,902 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:25:21,520 - INFO - CryptoPulse API Started
+2026-06-22 10:25:39,839 - INFO - Latest prices fetched successfully
+2026-06-22 10:25:50,846 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:26:22,794 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:26:53,801 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:27:27,616 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:28:01,263 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:28:34,258 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:29:06,102 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:29:36,921 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:30:10,410 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:30:41,638 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:31:12,489 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:31:44,004 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-22 10:32:17,407 - INFO - Prices stored successfully for coins: ['bitcoin', 'ethereum', 'solana']
+2026-06-23 10:51:47,445 - INFO - CryptoPulse API Started
+2026-06-23 10:56:48,927 - INFO - CryptoPulse API Started
+2026-06-23 10:56:49,959 - INFO - CryptoPulse API Started
+2026-06-23 10:57:23,868 - INFO - CryptoPulse API Started
+2026-06-23 10:57:26,089 - INFO - CryptoPulse API Started
+2026-06-23 11:00:01,693 - INFO - CryptoPulse API Started
