@@ -1,24 +1,75 @@
-from pydantic import BaseModel, EmailStr
+# Import BaseModel to create request and response models
+from pydantic import BaseModel, EmailStr, Field
 
 
-# Model for user signup request
-# User only needs email and password
+# --------------------------------------------------
+# User Signup Model
+# Used when a new user registers
+# --------------------------------------------------
 class UserSignup(BaseModel):
+
+    # User email (must be valid)
     email: EmailStr
-    password: str
+
+    # Password must contain at least 8 characters
+    password: str = Field(
+        min_length=8,
+        description="Password must contain at least 8 characters"
+    )
 
 
-# Model for login request
+# --------------------------------------------------
+# Login Request Model
+# Used when an existing user logs in
+# --------------------------------------------------
 class LoginRequest(BaseModel):
+
+    # Registered email
     email: EmailStr
-    password: str
+
+    # User password
+    password: str = Field(
+        min_length=8,
+        description="Password must contain at least 8 characters"
+    )
 
 
-# Model for token response
+# --------------------------------------------------
+# Forgot Password Request
+# User submits their email
+# --------------------------------------------------
+class ForgotPasswordRequest(BaseModel):
+
+    email: EmailStr
+
+
+# --------------------------------------------------
+# Reset Password Request
+# Used after verifying the user
+# --------------------------------------------------
+class ResetPasswordRequest(BaseModel):
+
+    new_password: str = Field(
+        min_length=8,
+        description="New password"
+    )
+
+    confirm_password: str = Field(
+        min_length=8,
+        description="Confirm password"
+    )
+
+
+# --------------------------------------------------
+# JWT Token Response
+# Returned after successful login
+# --------------------------------------------------
 class TokenResponse(BaseModel):
+
+    # JWT Access Token
     access_token: str
-    token_type: str
-    
-    
+
+    # Token type
+    token_type: str = "bearer"
     
     
