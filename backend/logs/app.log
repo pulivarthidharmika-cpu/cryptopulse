@@ -122,3 +122,18 @@
 2026-06-23 10:57:26,089 - INFO - CryptoPulse API Started
 2026-06-23 11:00:01,693 - INFO - CryptoPulse API Started
 2026-06-23 12:09:22,261 - INFO - CryptoPulse API Started
+2026-06-29 12:14:29,725 - INFO - CryptoPulse API Started
+2026-06-30 10:26:16,007 - INFO - CryptoPulse API Started
+2026-06-30 10:34:19,932 - INFO - CryptoPulse API Started
+2026-06-30 10:59:31,795 - INFO - CryptoPulse API Started
+2026-06-30 11:03:42,845 - INFO - Alert created successfully by dharmika@example.com
+2026-06-30 11:04:20,156 - INFO - Alerts fetched successfully for dharmika@example.com
+2026-06-30 11:07:04,309 - INFO - Alert updated by dharmika@example.com
+2026-06-30 11:09:02,814 - INFO - Alert deleted by dharmika@example.com
+2026-06-30 11:22:57,375 - INFO - CryptoPulse API Started
+2026-06-30 11:35:24,401 - INFO - CryptoPulse API Started
+2026-06-30 11:43:31,861 - INFO - bitcoin added by admin dharmika@example.com
+2026-06-30 11:43:42,732 - INFO - Coins fetched by dharmika@example.com
+2026-06-30 11:44:29,819 - INFO - bitcoin updated by dharmika@example.com
+2026-06-30 11:44:44,876 - INFO - bitcoin updated by dharmika@example.com
+2026-06-30 11:45:10,903 - INFO - solana deleted by dharmika@example.com

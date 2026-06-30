@@ -1,85 +1,13 @@
-<!DOCTYPE html>
-<html>
-
-<head>
-    <title>CryptoPulse Dashboard</title>
-
-    <style>
-
-        body{
-            font-family: Arial;
-            background-color: #111827;
-            color: white;
-            text-align: center;
-            padding: 30px;
-        }
-
-        h1{
-            color: #38bdf8;
-        }
-
-        .card{
-            background: #1f2937;
-            margin: 20px auto;
-            padding: 20px;
-            width: 300px;
-            border-radius: 10px;
-        }
-
-    </style>
-
-</head>
-
-<body>
-
-    <h1>CryptoPulse Dashboard</h1>
-
-    <div class="card">
-        <h2>Bitcoin</h2>
-        <p id="bitcoin">Loading...</p>
-    </div>
-
-    <div class="card">
-        <h2>Ethereum</h2>
-        <p id="ethereum">Loading...</p>
-    </div>
-
-    <div class="card">
-        <h2>Solana</h2>
-        <p id="solana">Loading...</p>
-    </div>
-
-    <script>
-    async function fetchPrices() {
-        try {
-            const response = await fetch("http://127.0.0.1:8000/prices");
-            const data = await response.json();
-
-            const latest = data[data.length - 1];
-
-            document.getElementById("bitcoin").innerText =
-                "$ " + latest.prices.bitcoin.usd;
-
-            document.getElementById("ethereum").innerText =
-                "$ " + latest.prices.ethereum.usd;
-
-            if (latest.prices.solana) {
-                document.getElementById("solana").innerText =
-                    "$ " + latest.prices.solana.usd;
-            } else {
-                document.getElementById("solana").innerText =
-                    "No Solana data yet";
-            }
-
-        } catch (error) {
-            console.log(error);
-        }
-    }
-
-    fetchPrices();
-    setInterval(fetchPrices, 30000);
-</script>
-
-</body>
-
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

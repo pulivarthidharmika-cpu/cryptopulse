@@ -1,0 +1,122 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+function Register() {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const navigate = useNavigate();
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const response = await fetch(`${BASE_URL}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Registration failed");
+      }
+
+      const data = await response.json();
+      console.log("Register success:", data);
+
+      alert("Registration successful! Please login.");
+
+      // redirect to login
+      navigate("/");
+    } catch (error) {
+      console.error(error.message);
+      alert("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h2>CryptoPulse Register</h2>
+
+      <form onSubmit={handleRegister} style={styles.form}>
+        <input
+          type="text"
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          style={styles.input}
+          required
+        />
+
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          style={styles.input}
+          required
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          style={styles.input}
+          required
+        />
+
+        <button type="submit" style={styles.button} disabled={loading}>
+          {loading ? "Registering..." : "Register"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+const styles = {
+  container: {
+    height: "100vh",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    fontFamily: "Arial",
+    backgroundColor: "#f5f5f5",
+  },
+  form: {
+    display: "flex",
+    flexDirection: "column",
+    width: "280px",
+    gap: "12px",
+    padding: "20px",
+    backgroundColor: "white",
+    borderRadius: "8px",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+  },
+  input: {
+    padding: "10px",
+    fontSize: "14px",
+    border: "1px solid #ccc",
+    borderRadius: "5px",
+  },
+  button: {
+    padding: "10px",
+    backgroundColor: "black",
+    color: "white",
+    border: "none",
+    borderRadius: "5px",
+    cursor: "pointer",
+  },
+};
+
+export default Register;
