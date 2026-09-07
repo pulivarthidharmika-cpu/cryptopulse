@@ -11,8 +11,8 @@ from passlib.context import CryptContext
 # Import FastAPI tools
 from fastapi import Depends, HTTPException
 
-# Import Bearer Authentication
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+# Import OAuth2 Password Bearer Authentication
+from fastapi.security import OAuth2PasswordBearer
 
 # Import JWT configuration
 from config.settings import (
@@ -33,11 +33,20 @@ pwd_context = CryptContext(
 
 
 # --------------------------------------------------
-# Bearer Authentication
-# Reads Authorization Header:
-# Bearer <token>
+# OAuth2 Password Bearer Authentication
+#
+# Swagger will use /auth/login to obtain the token.
+#
+# Swagger sends:
+# username = user's email
+# password = user's password
+#
+# Protected APIs receive:
+# Authorization: Bearer <token>
 # --------------------------------------------------
-security = HTTPBearer()
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/auth/login"
+)
 
 
 # --------------------------------------------------
@@ -99,13 +108,10 @@ def create_access_token(data: dict):
 # Used by protected APIs
 # --------------------------------------------------
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    token: str = Depends(oauth2_scheme)
 ):
 
     try:
-
-        # Extract token from request header
-        token = credentials.credentials
 
         # Decode JWT token
         payload = jwt.decode(

@@ -1,29 +1,15 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from fastapi.security import OAuth2PasswordRequestForm
 
-# Import request and response models
-from models.user_model import (
-    UserSignup,
-    LoginRequest,
-    TokenResponse
-)
-
-# Import MongoDB users collection
+from models.user_model import UserSignup, TokenResponse
 from database.database import users_collection
-
-# Import authentication helper functions
 from services.auth_service import (
     hash_password,
     verify_password,
     create_access_token
 )
 
-# --------------------------------------------------
-# Create Authentication Router
-# All endpoints in this file will start with /auth
-# Example:
-# POST /auth/signup
-# POST /auth/login
-# --------------------------------------------------
+
 router = APIRouter(
     prefix="/auth",
     tags=["Auth"]
@@ -32,61 +18,64 @@ router = APIRouter(
 
 # --------------------------------------------------
 # Signup API
-# Registers a new user
 # --------------------------------------------------
+
 @router.post("/signup")
 async def signup(user: UserSignup):
 
-    # Check if a user with the same email already exists
     existing_user = await users_collection.find_one(
         {"email": user.email}
     )
 
-    # If email already exists, stop registration
     if existing_user:
         raise HTTPException(
             status_code=400,
             detail="Email already exists"
         )
 
-    # Hash the user's password before storing it
     hashed_password = hash_password(user.password)
 
-    # Create user document
     new_user = {
         "email": user.email,
         "hashed_password": hashed_password,
-        "role": "user"      # Default role for every new user
+        "role": "pending"
     }
 
-    # Insert the user into MongoDB
     await users_collection.insert_one(new_user)
 
-    # Return success response
     return {
         "status": "success",
-        "message": "User registered successfully"
+        "message": "User registered successfully. Waiting for role assignment."
     }
 
 
 # --------------------------------------------------
 # Login API
-# Authenticates the user and returns a JWT token
 # --------------------------------------------------
+
 @router.post(
     "/login",
     response_model=TokenResponse
 )
-async def login(login_data: LoginRequest):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
 
-    # Search for the user using the email
+    email = form_data.username
+    password = form_data.password
+
     user = await users_collection.find_one(
-        {"email": login_data.email}
+        {"email": email}
     )
 
-    # If user doesn't exist OR password is incorrect
-    if not user or not verify_password(
-        login_data.password,
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid email or password"
+        )
+
+    if not verify_password(
+        password,
         user["hashed_password"]
     ):
         raise HTTPException(
@@ -94,19 +83,27 @@ async def login(login_data: LoginRequest):
             detail="Invalid email or password"
         )
 
-    # Generate JWT access token
+    role = user.get("role")
+
+    if role == "pending":
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is waiting for role assignment by an administrator."
+        )
+
+    if role not in ["user", "analyst", "admin"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid user role."
+        )
+
     access_token = create_access_token(
         data={
-            # Subject (user identifier)
             "sub": user["email"],
-
-            # User role (used for authorization)
-            "role": user.get("role", "user")
+            "role": role
         }
     )
 
-    # Return JWT token to the client
-    # FastAPI validates this response using TokenResponse
     return {
         "access_token": access_token,
         "token_type": "bearer"

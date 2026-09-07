@@ -1,8 +1,13 @@
 # Import FastAPI Router, Dependency Injection and HTTP Exception
 from fastapi import APIRouter, Depends, HTTPException
 
-# Import MongoDB collection
-from database.database import coins_collection
+# Import Pydantic BaseModel
+from pydantic import BaseModel
+
+import re
+
+# Import MongoDB collections
+from database.database import coins_collection, users_collection
 
 # Import Coin Model
 from models.crypto_model import CoinModel
@@ -15,6 +20,14 @@ from utils.logger import logger
 
 
 # --------------------------------------------------
+# Role Request Model
+# Used when Admin assigns a role to a user
+# --------------------------------------------------
+class RoleUpdate(BaseModel):
+    role: str
+
+
+# --------------------------------------------------
 # Admin Router
 # All Admin APIs start with /admin
 # --------------------------------------------------
@@ -22,6 +35,142 @@ router = APIRouter(
     prefix="/admin",
     tags=["Admin"]
 )
+
+
+# ==================================================
+# USER / ROLE MANAGEMENT
+# ==================================================
+
+
+# --------------------------------------------------
+# Get All Users
+# Only Admin users can view users
+# --------------------------------------------------
+@router.get("/users")
+async def get_users(
+    current_user: dict = Depends(get_admin_user)
+):
+
+    try:
+
+        users = await users_collection.find(
+            {},
+            {
+                "_id": 0,
+                "email": 1,
+                "role": 1
+            }
+        ).to_list(length=1000)
+
+        return {
+            "count": len(users),
+            "users": users
+        }
+
+    except Exception as e:
+
+        logger.error(
+            f"Fetching users failed: {str(e)}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to fetch users"
+        )
+
+
+# --------------------------------------------------
+# Assign / Update User Role
+# Only Admin can perform this operation
+# --------------------------------------------------
+@router.put("/users/{email}/role")
+async def update_user_role(
+    email: str,
+    role_data: RoleUpdate,
+    current_user: dict = Depends(get_admin_user)
+):
+
+    try:
+
+        # Clean the email received from the URL
+        email = email.strip().lower()
+
+        # Clean the role
+        new_role = role_data.role.strip().lower()
+
+        # Allowed roles
+        allowed_roles = [
+            "user",
+            "analyst",
+            "admin"
+        ]
+
+        # Validate role
+        if new_role not in allowed_roles:
+            raise HTTPException(
+                status_code=400,
+                detail="Role must be user, analyst, or admin"
+            )
+
+        # Find user using case-insensitive email matching
+        user = await users_collection.find_one(
+            {
+                "email": {
+                    "$regex": f"^{re.escape(email)}$",
+                    "$options": "i"
+                }
+            }
+        )
+
+        # User does not exist
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found"
+            )
+
+        # Update role
+        result = await users_collection.update_one(
+            {
+                "_id": user["_id"]
+            },
+            {
+                "$set": {
+                    "role": new_role
+                }
+            }
+        )
+
+        logger.info(
+            f"Role of {email} changed to {new_role} "
+            f"by admin {current_user['email']}"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Role updated to '{new_role}'",
+            "email": user["email"],
+            "role": new_role,
+            "updated_by": current_user["email"]
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+
+        logger.error(
+            f"Role update failed: {str(e)}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update user role"
+        )
+
+# ==================================================
+# CRYPTOCURRENCY MANAGEMENT
+# ==================================================
 
 
 # --------------------------------------------------
@@ -36,10 +185,8 @@ async def add_coin(
 
     try:
 
-        # Convert coin name to lowercase
         coin = coin_data.coin.lower()
 
-        # Check whether coin already exists
         existing_coin = await coins_collection.find_one(
             {"coin": coin}
         )
@@ -51,17 +198,11 @@ async def add_coin(
                 detail=f"{coin} already exists"
             )
 
-        # Create MongoDB document
         coin_document = {
-
             "coin": coin,
-
-            # Indicates whether this coin is currently supported
             "active": True
-
         }
 
-        # Insert into MongoDB
         await coins_collection.insert_one(
             coin_document
         )
@@ -71,11 +212,9 @@ async def add_coin(
         )
 
         return {
-
             "status": "success",
             "message": f"{coin} added successfully",
             "added_by": current_user["email"]
-
         }
 
     except HTTPException:
@@ -84,7 +223,7 @@ async def add_coin(
     except Exception as e:
 
         logger.error(
-            f"Coin creation failed : {str(e)}"
+            f"Coin creation failed: {str(e)}"
         )
 
         raise HTTPException(
@@ -114,16 +253,14 @@ async def get_coins(
         )
 
         return {
-
             "count": len(coins),
             "coins": coins
-
         }
 
     except Exception as e:
 
         logger.error(
-            f"Fetching coins failed : {str(e)}"
+            f"Fetching coins failed: {str(e)}"
         )
 
         raise HTTPException(
@@ -146,19 +283,14 @@ async def update_coin(
     try:
 
         result = await coins_collection.update_one(
-
             {
                 "coin": coin.lower()
             },
-
             {
                 "$set": {
-
                     "coin": coin_data.coin.lower()
-
                 }
             }
-
         )
 
         if result.matched_count == 0:
@@ -173,10 +305,8 @@ async def update_coin(
         )
 
         return {
-
             "status": "success",
             "message": "Coin updated successfully"
-
         }
 
     except HTTPException:
@@ -185,7 +315,7 @@ async def update_coin(
     except Exception as e:
 
         logger.error(
-            f"Coin update failed : {str(e)}"
+            f"Coin update failed: {str(e)}"
         )
 
         raise HTTPException(
@@ -224,11 +354,9 @@ async def delete_coin(
         )
 
         return {
-
             "status": "success",
             "message": f"{coin} deleted successfully",
             "deleted_by": current_user["email"]
-
         }
 
     except HTTPException:
@@ -237,7 +365,7 @@ async def delete_coin(
     except Exception as e:
 
         logger.error(
-            f"Coin deletion failed : {str(e)}"
+            f"Coin deletion failed: {str(e)}"
         )
 
         raise HTTPException(

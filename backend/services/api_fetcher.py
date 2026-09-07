@@ -1,190 +1,210 @@
-# Import requests library to call external APIs
-import requests
-
-# Import asyncio for running continuous async tasks
 import asyncio
-
-# Import datetime to store timestamps
 from datetime import datetime
 
+import httpx
 
-# Import MongoDB collections
-from database.database import (
-    live_prices_collection,
-    historical_prices_collection,
-    coins_collection
+from database.database import coins_collection
+from config.settings import (
+    SUPPORTED_COINS,
+    CURRENCY,
+    KAFKA_BOOTSTRAP_SERVERS,
+    KAFKA_TOPIC
 )
-
-# Import project settings from .env/config
-from config.settings import SUPPORTED_COINS, CURRENCY
-
-# Import logger
+from kafka_service.producer import publish_price
 from utils.logger import logger
 
 
 # --------------------------------------------------
-# CoinGecko API URL
-# Used to fetch cryptocurrency data
+# CoinGecko API
 # --------------------------------------------------
+
 API_URL = "https://api.coingecko.com/api/v3/simple/price"
 
 
 # --------------------------------------------------
 # Get Active Coins
-# Reads coins from MongoDB coins collection
-# If no coins are found, it uses default SUPPORTED_COINS
+# Reads coins from MongoDB.
+# Falls back to SUPPORTED_COINS if none exist.
 # --------------------------------------------------
+
 async def get_active_coins():
 
-    # Fetch active coins from MongoDB
     coins = await coins_collection.find(
         {"active": True},
         {"_id": 0, "coin": 1}
     ).to_list(length=100)
 
-    # If coins exist in MongoDB, use them
     if coins:
-        return [coin["coin"] for coin in coins]
+        return [
+            coin["coin"].strip().lower()
+            for coin in coins
+        ]
 
-    # If coins collection is empty, use default coins
     return SUPPORTED_COINS
 
 
 # --------------------------------------------------
-# Fetch Crypto Prices and Store in MongoDB
+# Fetch Prices From CoinGecko
 # --------------------------------------------------
-async def fetch_and_store_prices():
+
+async def fetch_crypto_prices():
+
+    active_coins = await get_active_coins()
+
+    if not active_coins:
+        logger.warning("No active cryptocurrencies configured")
+        return []
+
+    params = {
+        "ids": ",".join(active_coins),
+        "vs_currencies": CURRENCY,
+        "include_24hr_vol": "true",
+        "include_market_cap": "true"
+    }
+
     try:
 
-        # Get coins from MongoDB
-        active_coins = await get_active_coins()
+        async with httpx.AsyncClient(timeout=10) as client:
 
-        # API parameters
-        params = {
-            "ids": ",".join(active_coins),
-            "vs_currencies": CURRENCY,
-            "include_24hr_vol": "true",
-            "include_market_cap": "true"
-        }
+            response = await client.get(
+                API_URL,
+                params=params
+            )
 
-        # Send GET request to CoinGecko API
-        response = requests.get(
-            API_URL,
-            params=params,
-            timeout=10
-        )
+            response.raise_for_status()
 
-        # Raise exception if API fails
-        response.raise_for_status()
+            data = response.json()
 
-        # Convert JSON response into Python dictionary
-        data = response.json()
+        timestamp = datetime.utcnow().isoformat()
 
-        # Current timestamp
-        timestamp = datetime.utcnow()
+        prices = []
 
-        # Loop through all active coins
         for coin in active_coins:
 
-            # Check if coin exists in API response
             if coin not in data:
+
                 logger.warning(
-                    f"{coin} not found in API response"
+                    f"{coin} not found in CoinGecko response"
                 )
+
                 continue
 
-            # Extract current price
-            price = data[coin].get(CURRENCY)
+            coin_data = data[coin]
 
-            # Extract 24-hour trading volume
-            volume = data[coin].get(
-                f"{CURRENCY}_24h_vol",
-                0
-            )
+            price = coin_data.get(CURRENCY)
 
-            # Extract market capitalization
-            market_cap = data[coin].get(
-                f"{CURRENCY}_market_cap",
-                0
-            )
+            if price is None:
 
-            # Create MongoDB document
+                logger.warning(
+                    f"Price unavailable for {coin}"
+                )
+
+                continue
+
             price_record = {
+
                 "coin": coin,
+
                 "price": price,
-                "volume": volume,
-                "market_cap": market_cap,
+
+                "volume": coin_data.get(
+                    f"{CURRENCY}_24h_vol",
+                    0
+                ),
+
+                "market_cap": coin_data.get(
+                    f"{CURRENCY}_market_cap",
+                    0
+                ),
+
                 "currency": CURRENCY,
+
                 "timestamp": timestamp
             }
 
-            # Store record in historical collection
-            await historical_prices_collection.insert_one(
-                price_record.copy()
-            )
+            prices.append(price_record)
 
-            # Update live prices collection
-            # Creates document if it does not exist
-            await live_prices_collection.update_one(
-                {"coin": coin},
-                {"$set": price_record},
-                upsert=True
-            )
-
-        # Success log
         logger.info(
-            f"Prices stored successfully for coins: {active_coins}"
+            f"Fetched prices successfully for {len(prices)} coins"
         )
 
-        print(
-            "Prices stored successfully for coins:",
-            active_coins
-        )
+        return prices
 
-    # Handle API-related errors
-    except requests.exceptions.RequestException as e:
+    except httpx.HTTPError as e:
 
         logger.error(
-            f"API request failed: {str(e)}"
+            f"CoinGecko API request failed: {str(e)}"
         )
 
-        print(
-            "API request failed:",
-            e
-        )
+        return []
 
-    # Handle unexpected errors
     except Exception as e:
 
         logger.error(
-            f"Error fetching prices: {str(e)}"
+            f"Price fetching failed: {str(e)}"
         )
 
-        print(
-            "Error fetching prices:",
-            e
-        )
+        return []
 
 
 # --------------------------------------------------
-# Main Function
-# Runs continuously every 30 seconds
+# Fetch Prices And Send To Kafka
 # --------------------------------------------------
+
+async def fetch_and_publish_prices():
+
+    prices = await fetch_crypto_prices()
+
+    if not prices:
+
+        logger.warning(
+            "No prices available to publish"
+        )
+
+        return
+
+    for price in prices:
+
+        try:
+
+            publish_price(price)
+
+            logger.info(
+                f"Published {price['coin']} price to Kafka"
+            )
+
+        except Exception as e:
+
+            logger.error(
+                f"Failed to publish {price['coin']}: {str(e)}"
+            )
+
+    logger.info(
+        f"Published {len(prices)} prices to Kafka topic '{KAFKA_TOPIC}'"
+    )
+
+
+# --------------------------------------------------
+# Continuous Price Fetcher
+# --------------------------------------------------
+
 async def main():
+
+    logger.info(
+        "CryptoPulse price fetcher started"
+    )
 
     while True:
 
-        # Fetch latest prices
-        await fetch_and_store_prices()
+        await fetch_and_publish_prices()
 
-        # Wait 30 seconds
         await asyncio.sleep(30)
 
 
 # --------------------------------------------------
-# Program Entry Point
-# Runs only when file is executed directly
+# Run Directly
 # --------------------------------------------------
+
 if __name__ == "__main__":
+
     asyncio.run(main())
-    
