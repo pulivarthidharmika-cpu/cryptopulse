@@ -26,9 +26,10 @@ function Login() {
       // Redirect to dashboard
       navigate("/dashboard");
     } catch (error) {
-      console.error("Login failed:", error.message);
-      alert("Invalid email or password");
-    } finally {
+      console.error("Login failed:", error);
+      alert(error.message);
+    }
+    finally {
       setLoading(false);
     }
   };

@@ -1,14 +1,9 @@
 import { Navigate } from "react-router-dom";
+import { isAuthenticated } from "../utils/auth";
 
 function ProtectedRoute({ children }) {
-  import { isLoggedIn } from "../utils/auth";
-
-if (!isLoggedIn()) {
-  return <Navigate to="/" replace />;
-}
-  if (!token) {
-    // not logged in → send to login
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
   }
 
   return children;
