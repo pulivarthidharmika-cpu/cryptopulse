@@ -4,14 +4,20 @@ from pydantic import BaseModel, EmailStr, Field
 
 # --------------------------------------------------
 # User Signup Model
-# Used when a new user registers
 # --------------------------------------------------
+
 class UserSignup(BaseModel):
 
-    # User email (must be valid)
+    # User's name
+    name: str = Field(
+        min_length=1,
+        description="User's name"
+    )
+
+    # User email
     email: EmailStr
 
-    # Password must contain at least 8 characters
+    # Password
     password: str = Field(
         min_length=8,
         description="Password must contain at least 8 characters"
@@ -20,14 +26,12 @@ class UserSignup(BaseModel):
 
 # --------------------------------------------------
 # Login Request Model
-# Used when an existing user logs in
 # --------------------------------------------------
+
 class LoginRequest(BaseModel):
 
-    # Registered email
     email: EmailStr
 
-    # User password
     password: str = Field(
         min_length=8,
         description="Password must contain at least 8 characters"
@@ -36,8 +40,8 @@ class LoginRequest(BaseModel):
 
 # --------------------------------------------------
 # Forgot Password Request
-# User submits their email
 # --------------------------------------------------
+
 class ForgotPasswordRequest(BaseModel):
 
     email: EmailStr
@@ -45,8 +49,8 @@ class ForgotPasswordRequest(BaseModel):
 
 # --------------------------------------------------
 # Reset Password Request
-# Used after verifying the user
 # --------------------------------------------------
+
 class ResetPasswordRequest(BaseModel):
 
     new_password: str = Field(
@@ -62,8 +66,8 @@ class ResetPasswordRequest(BaseModel):
 
 # --------------------------------------------------
 # JWT Token Response
-# Returned after successful login
 # --------------------------------------------------
+
 class TokenResponse(BaseModel):
 
     # JWT Access Token
@@ -71,5 +75,9 @@ class TokenResponse(BaseModel):
 
     # Token type
     token_type: str = "bearer"
-    
-    
+
+    # User's name
+    name: str
+
+    # User's role
+    role: str

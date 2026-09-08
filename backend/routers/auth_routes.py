@@ -33,9 +33,12 @@ async def signup(user: UserSignup):
             detail="Email already exists"
         )
 
-    hashed_password = hash_password(user.password)
+    hashed_password = hash_password(
+        user.password
+    )
 
     new_user = {
+        "name": user.name,
         "email": user.email,
         "hashed_password": hashed_password,
         "role": "pending"
@@ -45,7 +48,10 @@ async def signup(user: UserSignup):
 
     return {
         "status": "success",
-        "message": "User registered successfully. Waiting for role assignment."
+        "message": (
+            "User registered successfully. "
+            "Waiting for role assignment."
+        )
     }
 
 
@@ -74,6 +80,7 @@ async def login(
             detail="Invalid email or password"
         )
 
+    # Verify password
     if not verify_password(
         password,
         user["hashed_password"]
@@ -83,28 +90,43 @@ async def login(
             detail="Invalid email or password"
         )
 
+    # Get role
     role = user.get("role")
 
+    # Pending users cannot login
     if role == "pending":
         raise HTTPException(
             status_code=403,
-            detail="Your account is waiting for role assignment by an administrator."
+            detail=(
+                "Your account is waiting for role "
+                "assignment by an administrator."
+            )
         )
 
-    if role not in ["user", "analyst", "admin"]:
+    # Validate role
+    if role not in [
+        "user",
+        "analyst",
+        "admin"
+    ]:
         raise HTTPException(
             status_code=403,
             detail="Invalid user role."
         )
 
+    # Create JWT token
     access_token = create_access_token(
         data={
             "sub": user["email"],
-            "role": role
+            "role": role,
+            "name": user.get("name", "User")
         }
     )
 
+    # Return token + user information
     return {
         "access_token": access_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "name": user.get("name", "User"),
+        "role": role
     }
