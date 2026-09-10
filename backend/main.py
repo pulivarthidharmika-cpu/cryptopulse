@@ -1,7 +1,19 @@
+import sys
+from pathlib import Path
+
+# Ensure backend directory is in sys.path for relative imports
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 import asyncio
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from database.database import coins_collection, users_collection
+from config.settings import SUPPORTED_COINS, ADMIN_EMAIL, ADMIN_PASSWORD
+from services.auth_service import hash_password
 
 from routers.price_routes import router as price_router
 from routers.analytics_routes import router as analytics_router
@@ -26,6 +38,9 @@ app = FastAPI(
     version="1.0.0",
     contact={
         "name": "CryptoPulse Team"
+    },
+    swagger_ui_parameters={
+        "persistAuthorization": True
     }
 )
 
@@ -78,6 +93,39 @@ async def price_fetcher_loop():
 async def startup_event():
 
     logger.info("CryptoPulse API Started")
+
+    # ----------------------------------------------
+    # Seed Supported Coins in MongoDB
+    # ----------------------------------------------
+    try:
+        for coin in SUPPORTED_COINS:
+            await coins_collection.update_one(
+                {"coin": coin},
+                {"$setOnInsert": {"coin": coin, "active": True}},
+                upsert=True
+            )
+        logger.info("Default supported coins verified in MongoDB")
+    except Exception as e:
+        logger.warning(f"Could not seed default coins: {str(e)}")
+
+    # ----------------------------------------------
+    # Verify / Seed Admin User in MongoDB
+    # ----------------------------------------------
+    try:
+        admin_email = ADMIN_EMAIL.strip().lower()
+        existing_admin = await users_collection.find_one({"email": admin_email})
+        if not existing_admin:
+            await users_collection.insert_one({
+                "name": "Dharmika",
+                "email": admin_email,
+                "hashed_password": hash_password(ADMIN_PASSWORD),
+                "role": "admin"
+            })
+            logger.info(f"Default admin user initialized in MongoDB: {admin_email}")
+        else:
+            logger.info(f"Admin user verified in MongoDB: {admin_email}")
+    except Exception as e:
+        logger.warning(f"Could not verify admin user: {str(e)}")
 
     # ----------------------------------------------
     # Start Price Fetcher
@@ -173,3 +221,12 @@ app.include_router(
 app.include_router(
     admin_router
 )
+
+
+# --------------------------------------------------
+# Run with Uvicorn
+# --------------------------------------------------
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

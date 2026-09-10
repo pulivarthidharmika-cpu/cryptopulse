@@ -3,13 +3,30 @@ import { useState } from "react";
 
 function Layout() {
   const navigate = useNavigate();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const [showLogoutModal, setShowLogoutModal] =
+    useState(false);
+
+  const [sidebarOpen, setSidebarOpen] =
+    useState(false);
+
+  // Get logged-in user's role
+  const role = localStorage.getItem("role");
+
+  // --------------------------------------------------
+  // Logout
+  // --------------------------------------------------
 
   const handleLogout = () => {
-    localStorage.setItem("loggedOut", "true");
+    localStorage.setItem(
+      "loggedOut",
+      "true"
+    );
 
     localStorage.removeItem("token");
     localStorage.removeItem("role");
+    localStorage.removeItem("userEmail");
+    localStorage.removeItem("profileName");
 
     setShowLogoutModal(false);
 
@@ -19,9 +36,24 @@ function Layout() {
   return (
     <div style={styles.container}>
 
-      {/* Sidebar */}
+      {/* Mobile Backdrop */}
+      {sidebarOpen && (
+        <div
+          className="layout-sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <aside style={styles.sidebar}>
+      {/* ================================================== */}
+      {/* SIDEBAR */}
+      {/* ================================================== */}
+
+      <aside
+        style={styles.sidebar}
+        className={`layout-sidebar ${
+          sidebarOpen ? "open" : ""
+        }`}
+      >
 
         <div>
 
@@ -34,6 +66,7 @@ function Layout() {
             </div>
 
             <div>
+
               <h2 style={styles.logoText}>
                 CryptoPulse
               </h2>
@@ -41,18 +74,34 @@ function Layout() {
               <span style={styles.logoSubtext}>
                 Crypto Analytics
               </span>
+
             </div>
+
+            <button
+              className="layout-sidebar-close"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
 
           </div>
 
+
+          {/* Divider */}
+
           <div style={styles.divider}></div>
+
 
           {/* Navigation */}
 
           <nav style={styles.nav}>
 
+            {/* Dashboard */}
+
             <NavLink
               to="/dashboard"
+              onClick={() => setSidebarOpen(false)}
               style={({ isActive }) => ({
                 ...styles.link,
                 ...(isActive
@@ -64,8 +113,12 @@ function Layout() {
               Dashboard
             </NavLink>
 
+
+            {/* Analytics */}
+
             <NavLink
               to="/analytics"
+              onClick={() => setSidebarOpen(false)}
               style={({ isActive }) => ({
                 ...styles.link,
                 ...(isActive
@@ -77,8 +130,12 @@ function Layout() {
               Analytics
             </NavLink>
 
+
+            {/* Alerts */}
+
             <NavLink
               to="/alerts"
+              onClick={() => setSidebarOpen(false)}
               style={({ isActive }) => ({
                 ...styles.link,
                 ...(isActive
@@ -90,8 +147,12 @@ function Layout() {
               Alerts
             </NavLink>
 
+
+            {/* Settings */}
+
             <NavLink
               to="/settings"
+              onClick={() => setSidebarOpen(false)}
               style={({ isActive }) => ({
                 ...styles.link,
                 ...(isActive
@@ -103,19 +164,49 @@ function Layout() {
               Settings
             </NavLink>
 
+
+            {/* ================================================== */}
+            {/* ADMIN PANEL */}
+            {/* Only visible to admin */}
+            {/* ================================================== */}
+
+            {role === "admin" && (
+
+              <NavLink
+                to="/admin"
+                onClick={() => setSidebarOpen(false)}
+                style={({ isActive }) => ({
+                  ...styles.link,
+                  ...(isActive
+                    ? styles.activeLink
+                    : {}),
+                })}
+              >
+                <span>♛</span>
+                Admin Panel
+              </NavLink>
+
+            )}
+
           </nav>
 
         </div>
 
-        {/* Sidebar Bottom */}
+
+        {/* ================================================== */}
+        {/* SIDEBAR BOTTOM */}
+        {/* ================================================== */}
 
         <div>
+
+          {/* System Status */}
 
           <div style={styles.systemStatus}>
 
             <span style={styles.statusDot}></span>
 
             <div>
+
               <strong style={styles.statusTitle}>
                 System Online
               </strong>
@@ -123,12 +214,18 @@ function Layout() {
               <span style={styles.statusText}>
                 API Connected
               </span>
+
             </div>
 
           </div>
 
+
+          {/* Logout */}
+
           <button
-            onClick={() => setShowLogoutModal(true)}
+            onClick={() =>
+              setShowLogoutModal(true)
+            }
             style={styles.logout}
           >
             <span>↪</span>
@@ -139,25 +236,60 @@ function Layout() {
 
       </aside>
 
-      {/* Main */}
 
-      <div style={styles.main}>
+      {/* ================================================== */}
+      {/* MAIN AREA */}
+      {/* ================================================== */}
 
-        <header style={styles.header}>
+      <div
+        style={styles.main}
+        className="layout-main"
+      >
 
-          <div>
+        {/* Header */}
 
-            <span style={styles.headerTitle}>
-              CryptoPulse Monitoring System
-            </span>
+        <header
+          style={styles.header}
+          className="layout-header"
+        >
 
-            <span style={styles.headerSubtext}>
-              Real-time cryptocurrency intelligence
-            </span>
+          <div className="layout-header-left">
+
+            <button
+              className="layout-menu-button"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open navigation menu"
+            >
+              ☰
+            </button>
+
+            <div>
+
+              <span
+                style={styles.headerTitle}
+                className="layout-header-title"
+              >
+                CryptoPulse Monitoring System
+              </span>
+
+              <span
+                style={styles.headerSubtext}
+                className="layout-header-subtext"
+              >
+                Real-time cryptocurrency intelligence
+              </span>
+
+            </div>
 
           </div>
 
-          <div style={styles.headerStatus}>
+
+          {/* Live Status */}
+
+          <div
+            style={styles.headerStatus}
+            className="layout-header-status"
+          >
 
             <span style={styles.statusDot}></span>
 
@@ -167,13 +299,22 @@ function Layout() {
 
         </header>
 
-        <main style={styles.content}>
+
+        {/* Page Content */}
+
+        <main
+          style={styles.content}
+          className="layout-content"
+        >
           <Outlet />
         </main>
 
       </div>
 
-      {/* Logout Confirmation */}
+
+      {/* ================================================== */}
+      {/* LOGOUT CONFIRMATION MODAL */}
+      {/* ================================================== */}
 
       {showLogoutModal && (
 
@@ -181,18 +322,29 @@ function Layout() {
 
           <div style={styles.modal}>
 
+            {/* Modal Icon */}
+
             <div style={styles.modalIcon}>
               ↪
             </div>
+
+
+            {/* Title */}
 
             <h2 style={styles.modalTitle}>
               Confirm Logout
             </h2>
 
+
+            {/* Message */}
+
             <p style={styles.modalText}>
               Are you sure you want to logout
               from CryptoPulse?
             </p>
+
+
+            {/* Buttons */}
 
             <div style={styles.modalButtons}>
 
@@ -204,6 +356,7 @@ function Layout() {
               >
                 Cancel
               </button>
+
 
               <button
                 onClick={handleLogout}
@@ -220,11 +373,120 @@ function Layout() {
 
       )}
 
+
+      {/* ================================================== */}
+      {/* RESPONSIVE STYLES */}
+      {/* ================================================== */}
+
+      <style>
+        {`
+          .layout-menu-button {
+            display: none;
+            background: transparent;
+            border: none;
+            font-size: 24px;
+            color: #172554;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-right: 12px;
+          }
+
+          .layout-sidebar-close {
+            display: none;
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            color: #93c5fd;
+            cursor: pointer;
+            padding: 4px 8px;
+            margin-left: auto;
+          }
+
+          .layout-sidebar-backdrop {
+            display: none;
+          }
+
+          .layout-header-left {
+            display: flex;
+            align-items: center;
+          }
+
+          @media (max-width: 768px) {
+
+            .layout-menu-button {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+            }
+
+            .layout-sidebar-close {
+              display: block;
+            }
+
+            .layout-sidebar-backdrop {
+              display: block;
+              position: fixed;
+              inset: 0;
+              background: rgba(2, 6, 23, 0.6);
+              backdrop-filter: blur(4px);
+              z-index: 998;
+            }
+
+            .layout-sidebar {
+              position: fixed !important;
+              top: 0 !important;
+              bottom: 0 !important;
+              left: 0 !important;
+              z-index: 999 !important;
+              transform: translateX(-100%);
+              transition:
+                transform 0.3s
+                cubic-bezier(0.4, 0, 0.2, 1);
+              box-shadow:
+                10px 0 40px
+                rgba(0, 0, 0, 0.4) !important;
+            }
+
+            .layout-sidebar.open {
+              transform: translateX(0) !important;
+            }
+
+            .layout-header {
+              padding: 0 16px !important;
+              height: 65px !important;
+            }
+
+            .layout-header-title {
+              font-size: 15px !important;
+            }
+
+            .layout-header-subtext {
+              display: none !important;
+            }
+
+            .layout-content {
+              min-height:
+                calc(100vh - 65px) !important;
+            }
+          }
+        `}
+      </style>
+
     </div>
   );
 }
 
+
+/* ================================================== */
+/* STYLES */
+/* ================================================== */
+
 const styles = {
+
+  /* -------------------------------------------------- */
+  /* Main Container */
+  /* -------------------------------------------------- */
 
   container: {
     minHeight: "100vh",
@@ -237,6 +499,11 @@ const styles = {
     fontFamily:
       "Inter, Arial, Helvetica, sans-serif",
   },
+
+
+  /* -------------------------------------------------- */
+  /* Sidebar */
+  /* -------------------------------------------------- */
 
   sidebar: {
     width: "260px",
@@ -262,6 +529,11 @@ const styles = {
       "8px 0 30px rgba(15, 23, 42, 0.15)",
   },
 
+
+  /* -------------------------------------------------- */
+  /* Logo */
+  /* -------------------------------------------------- */
+
   logoArea: {
     display: "flex",
 
@@ -274,6 +546,7 @@ const styles = {
 
   logo: {
     width: "48px",
+
     height: "48px",
 
     borderRadius: "13px",
@@ -311,14 +584,25 @@ const styles = {
     fontSize: "12px",
   },
 
+
+  /* -------------------------------------------------- */
+  /* Divider */
+  /* -------------------------------------------------- */
+
   divider: {
     height: "1px",
 
     background:
       "rgba(255,255,255,0.1)",
 
-    margin: "30px 8px 22px",
+    margin:
+      "30px 8px 22px",
   },
+
+
+  /* -------------------------------------------------- */
+  /* Navigation */
+  /* -------------------------------------------------- */
 
   nav: {
     display: "flex",
@@ -362,6 +646,11 @@ const styles = {
     boxShadow:
       "0 6px 20px rgba(37,99,235,0.3)",
   },
+
+
+  /* -------------------------------------------------- */
+  /* System Status */
+  /* -------------------------------------------------- */
 
   systemStatus: {
     display: "flex",
@@ -414,6 +703,11 @@ const styles = {
     color: "#93c5fd",
   },
 
+
+  /* -------------------------------------------------- */
+  /* Logout */
+  /* -------------------------------------------------- */
+
   logout: {
     width: "100%",
 
@@ -445,11 +739,21 @@ const styles = {
       "all 0.2s ease",
   },
 
+
+  /* -------------------------------------------------- */
+  /* Main */
+  /* -------------------------------------------------- */
+
   main: {
     flex: 1,
 
     minWidth: 0,
   },
+
+
+  /* -------------------------------------------------- */
+  /* Header */
+  /* -------------------------------------------------- */
 
   header: {
     height: "75px",
@@ -470,7 +774,8 @@ const styles = {
     borderBottom:
       "1px solid rgba(59,130,246,0.12)",
 
-    backdropFilter: "blur(12px)",
+    backdropFilter:
+      "blur(12px)",
   },
 
   headerTitle: {
@@ -507,12 +812,20 @@ const styles = {
     fontSize: "13px",
   },
 
+
+  /* -------------------------------------------------- */
+  /* Content */
+  /* -------------------------------------------------- */
+
   content: {
     minHeight:
       "calc(100vh - 75px)",
   },
 
-  /* Modal */
+
+  /* ================================================== */
+  /* Logout Modal */
+  /* ================================================== */
 
   modalOverlay: {
     position: "fixed",
@@ -654,5 +967,6 @@ const styles = {
       "0 6px 20px rgba(37,99,235,0.3)",
   },
 };
+
 
 export default Layout;

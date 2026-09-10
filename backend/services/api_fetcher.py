@@ -7,25 +7,48 @@ from database.database import coins_collection
 from config.settings import (
     SUPPORTED_COINS,
     CURRENCY,
-    KAFKA_BOOTSTRAP_SERVERS,
-    KAFKA_TOPIC
+    KAFKA_TOPIC,
+    COINGECKO_API_URL,
+    BINANCE_API_URL,
+    CRYPTOCOMPARE_API_URL,
+    MARKET_DATA_INTERVAL_SECONDS,
 )
 from kafka_service.producer import publish_price
+from kafka_service.consumer import store_price
 from utils.logger import logger
 
 
-# --------------------------------------------------
-# CoinGecko API
-# --------------------------------------------------
+# ============================================================
+# API ENDPOINTS
+# ============================================================
 
-API_URL = "https://api.coingecko.com/api/v3/simple/price"
+COINGECKO_PRICE_URL = f"{COINGECKO_API_URL}/simple/price"
+BINANCE_TICKER_URL = f"{BINANCE_API_URL}/ticker/24hr"
+CRYPTOCOMPARE_PRICE_URL = f"{CRYPTOCOMPARE_API_URL}/pricemultifull"
 
 
-# --------------------------------------------------
-# Get Active Coins
-# Reads coins from MongoDB.
-# Falls back to SUPPORTED_COINS if none exist.
-# --------------------------------------------------
+# ============================================================
+# COIN MAPPING
+# ============================================================
+
+# MongoDB / CoinGecko names -> Binance symbols
+BINANCE_SYMBOLS = {
+    "bitcoin": "BTCUSDT",
+    "ethereum": "ETHUSDT",
+    "solana": "SOLUSDT",
+}
+
+# MongoDB / CoinGecko names -> CryptoCompare symbols
+CRYPTOCOMPARE_SYMBOLS = {
+    "bitcoin": "BTC",
+    "ethereum": "ETH",
+    "solana": "SOL",
+}
+
+
+# ============================================================
+# GET ACTIVE COINS
+# ============================================================
 
 async def get_active_coins():
 
@@ -38,118 +61,350 @@ async def get_active_coins():
         return [
             coin["coin"].strip().lower()
             for coin in coins
+            if coin.get("coin")
         ]
 
     return SUPPORTED_COINS
 
 
-# --------------------------------------------------
-# Fetch Prices From CoinGecko
-# --------------------------------------------------
+# ============================================================
+# FETCH COINGECKO DATA
+# ============================================================
 
-async def fetch_crypto_prices():
-
-    active_coins = await get_active_coins()
-
-    if not active_coins:
-        logger.warning("No active cryptocurrencies configured")
-        return []
+async def fetch_coingecko_prices(client, active_coins):
 
     params = {
         "ids": ",".join(active_coins),
         "vs_currencies": CURRENCY,
         "include_24hr_vol": "true",
-        "include_market_cap": "true"
+        "include_market_cap": "true",
+        "include_24hr_change": "true",
     }
 
     try:
 
-        async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
+            COINGECKO_PRICE_URL,
+            params=params
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        logger.info(
+            f"CoinGecko returned data for {len(data)} coins"
+        )
+
+        return data
+
+    except Exception as e:
+
+        logger.warning(
+            f"CoinGecko API request failed: {str(e)}"
+        )
+
+        return {}
+
+
+# ============================================================
+# FETCH BINANCE DATA
+# ============================================================
+
+async def fetch_binance_prices(client, active_coins):
+
+    results = {}
+
+    for coin in active_coins:
+
+        symbol = BINANCE_SYMBOLS.get(coin)
+
+        if not symbol:
+            continue
+
+        try:
 
             response = await client.get(
-                API_URL,
-                params=params
+                BINANCE_TICKER_URL,
+                params={"symbol": symbol}
             )
 
             response.raise_for_status()
 
             data = response.json()
 
-        timestamp = datetime.utcnow().isoformat()
+            results[coin] = data
 
-        prices = []
+        except Exception as e:
 
-        for coin in active_coins:
+            logger.warning(
+                f"Binance request failed for {coin}: {str(e)}"
+            )
 
-            if coin not in data:
+    logger.info(
+        f"Binance returned data for {len(results)} coins"
+    )
 
-                logger.warning(
-                    f"{coin} not found in CoinGecko response"
-                )
+    return results
 
-                continue
 
-            coin_data = data[coin]
+# ============================================================
+# FETCH CRYPTOCOMPARE DATA
+# ============================================================
 
-            price = coin_data.get(CURRENCY)
+async def fetch_cryptocompare_prices(client, active_coins):
 
-            if price is None:
+    symbols = [
+        CRYPTOCOMPARE_SYMBOLS[coin]
+        for coin in active_coins
+        if coin in CRYPTOCOMPARE_SYMBOLS
+    ]
 
-                logger.warning(
-                    f"Price unavailable for {coin}"
-                )
+    if not symbols:
+        return {}
 
-                continue
+    params = {
+        "fsyms": ",".join(symbols),
+        "tsyms": CURRENCY.upper(),
+    }
 
-            price_record = {
+    try:
 
-                "coin": coin,
+        response = await client.get(
+            CRYPTOCOMPARE_PRICE_URL,
+            params=params
+        )
 
-                "price": price,
+        response.raise_for_status()
 
-                "volume": coin_data.get(
-                    f"{CURRENCY}_24h_vol",
-                    0
-                ),
-
-                "market_cap": coin_data.get(
-                    f"{CURRENCY}_market_cap",
-                    0
-                ),
-
-                "currency": CURRENCY,
-
-                "timestamp": timestamp
-            }
-
-            prices.append(price_record)
+        data = response.json()
 
         logger.info(
-            f"Fetched prices successfully for {len(prices)} coins"
+            f"CryptoCompare returned data for {len(symbols)} coins"
+        )
+
+        return data.get("RAW", {})
+
+    except Exception as e:
+
+        logger.warning(
+            f"CryptoCompare API request failed: {str(e)}"
+        )
+
+        return {}
+
+
+# ============================================================
+# BUILD UNIFIED PRICE RECORD
+# ============================================================
+
+def build_price_records(
+    active_coins,
+    coingecko_data,
+    binance_data,
+    cryptocompare_data
+):
+
+    timestamp = datetime.utcnow().isoformat()
+
+    prices = []
+
+    for coin in active_coins:
+
+        cg = coingecko_data.get(coin, {})
+
+        price = cg.get(CURRENCY)
+
+        # ----------------------------------------------------
+        # Prefer Binance real-time price when available
+        # ----------------------------------------------------
+
+        binance = binance_data.get(coin, {})
+
+        if binance.get("lastPrice") is not None:
+
+            try:
+                price = float(binance["lastPrice"])
+            except (TypeError, ValueError):
+                pass
+
+        # ----------------------------------------------------
+        # Skip coin if no price is available
+        # ----------------------------------------------------
+
+        if price is None:
+
+            logger.warning(
+                f"No price available for {coin}"
+            )
+
+            continue
+
+        # ----------------------------------------------------
+        # Volume
+        # ----------------------------------------------------
+
+        volume = cg.get(
+            f"{CURRENCY}_24h_vol",
+            0
+        )
+
+        if binance.get("quoteVolume") is not None:
+
+            try:
+                volume = float(binance["quoteVolume"])
+            except (TypeError, ValueError):
+                pass
+
+        # ----------------------------------------------------
+        # Market cap
+        # CoinGecko provides this.
+        # ----------------------------------------------------
+
+        market_cap = cg.get(
+            f"{CURRENCY}_market_cap",
+            0
+        )
+
+        # ----------------------------------------------------
+        # 24 hour change
+        # ----------------------------------------------------
+
+        change_24h = cg.get(
+            f"{CURRENCY}_24h_change",
+            0
+        )
+
+        if binance.get("priceChangePercent") is not None:
+
+            try:
+                change_24h = float(
+                    binance["priceChangePercent"]
+                )
+            except (TypeError, ValueError):
+                pass
+
+        # ----------------------------------------------------
+        # CryptoCompare enrichment
+        # ----------------------------------------------------
+
+        cc_symbol = CRYPTOCOMPARE_SYMBOLS.get(coin)
+
+        cryptocompare = {}
+
+        if cc_symbol:
+
+            cryptocompare = cryptocompare_data.get(
+                cc_symbol,
+                {}
+            ).get(
+                CURRENCY.upper(),
+                {}
+            )
+
+        price_record = {
+
+            "coin": coin,
+
+            "price": float(price),
+
+            "volume": float(volume or 0),
+
+            "market_cap": float(market_cap or 0),
+
+            "change_24h": float(change_24h or 0),
+
+            "currency": CURRENCY,
+
+            "timestamp": timestamp,
+
+            # Source information is useful for debugging
+            # and demonstrating multi-API integration.
+            "sources": {
+                "coingecko": bool(cg),
+                "binance": bool(binance),
+                "cryptocompare": bool(cryptocompare),
+            },
+
+            # Additional Binance information
+            "binance_symbol": binance.get("symbol"),
+
+            # Additional CryptoCompare information
+            "cryptocompare_price": cryptocompare.get(
+                "PRICE"
+            ),
+        }
+
+        prices.append(price_record)
+
+    return prices
+
+
+# ============================================================
+# FETCH PRICES FROM ALL APIs
+# ============================================================
+
+async def fetch_crypto_prices():
+
+    active_coins = await get_active_coins()
+
+    if not active_coins:
+
+        logger.warning(
+            "No active cryptocurrencies configured"
+        )
+
+        return []
+
+    try:
+
+        async with httpx.AsyncClient(timeout=10) as client:
+
+            # Run the three API requests concurrently.
+            coingecko_data, binance_data, cryptocompare_data = (
+                await asyncio.gather(
+                    fetch_coingecko_prices(
+                        client,
+                        active_coins
+                    ),
+
+                    fetch_binance_prices(
+                        client,
+                        active_coins
+                    ),
+
+                    fetch_cryptocompare_prices(
+                        client,
+                        active_coins
+                    ),
+                )
+            )
+
+        prices = build_price_records(
+            active_coins,
+            coingecko_data,
+            binance_data,
+            cryptocompare_data
+        )
+
+        logger.info(
+            f"Unified market data created for {len(prices)} coins"
         )
 
         return prices
 
-    except httpx.HTTPError as e:
-
-        logger.error(
-            f"CoinGecko API request failed: {str(e)}"
-        )
-
-        return []
-
     except Exception as e:
 
         logger.error(
-            f"Price fetching failed: {str(e)}"
+            f"Multi-API price fetching failed: {str(e)}"
         )
 
         return []
 
 
-# --------------------------------------------------
-# Fetch Prices And Send To Kafka
-# --------------------------------------------------
+# ============================================================
+# FETCH + STORE + KAFKA
+# ============================================================
 
 async def fetch_and_publish_prices():
 
@@ -165,45 +420,69 @@ async def fetch_and_publish_prices():
 
     for price in prices:
 
+        # ----------------------------------------------------
+        # 1. Store directly in MongoDB
+        # ----------------------------------------------------
+
         try:
 
-            publish_price(price)
-
-            logger.info(
-                f"Published {price['coin']} price to Kafka"
-            )
+            await store_price(price)
 
         except Exception as e:
 
             logger.error(
-                f"Failed to publish {price['coin']}: {str(e)}"
+                f"Failed to store "
+                f"{price['coin']} in MongoDB: {str(e)}"
+            )
+
+        # ----------------------------------------------------
+        # 2. Publish to Kafka
+        # ----------------------------------------------------
+
+        try:
+
+            publish_price(price)
+
+        except Exception as e:
+
+            logger.warning(
+                f"Failed to publish "
+                f"{price['coin']} to Kafka: {str(e)}"
             )
 
     logger.info(
-        f"Published {len(prices)} prices to Kafka topic '{KAFKA_TOPIC}'"
+        f"Fetched & stored {len(prices)} prices "
+        f"in MongoDB "
+        f"(Kafka topic: '{KAFKA_TOPIC}')"
     )
 
 
-# --------------------------------------------------
-# Continuous Price Fetcher
-# --------------------------------------------------
+# ============================================================
+# CONTINUOUS PRICE FETCHER
+# ============================================================
 
 async def main():
 
     logger.info(
-        "CryptoPulse price fetcher started"
+        "CryptoPulse multi-API price fetcher started"
+    )
+
+    logger.info(
+        "APIs enabled: CoinGecko + Binance + CryptoCompare"
     )
 
     while True:
 
         await fetch_and_publish_prices()
 
-        await asyncio.sleep(30)
+        await asyncio.sleep(
+            MARKET_DATA_INTERVAL_SECONDS
+        )
 
 
-# --------------------------------------------------
-# Run Directly
-# --------------------------------------------------
+# ============================================================
+# RUN DIRECTLY
+# ============================================================
 
 if __name__ == "__main__":
 

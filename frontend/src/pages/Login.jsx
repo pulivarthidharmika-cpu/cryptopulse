@@ -26,10 +26,7 @@ function Login() {
 
       console.log("Login successful:", data);
 
-      // --------------------------------------------------
       // Store authentication information
-      // --------------------------------------------------
-
       localStorage.setItem(
         "token",
         data.access_token
@@ -37,10 +34,7 @@ function Login() {
 
       localStorage.removeItem("loggedOut");
 
-      // --------------------------------------------------
       // Store user information
-      // --------------------------------------------------
-
       localStorage.setItem(
         "userEmail",
         email
@@ -56,10 +50,7 @@ function Login() {
         data.role || "user"
       );
 
-      // --------------------------------------------------
       // Go to Dashboard
-      // --------------------------------------------------
-
       navigate("/dashboard");
 
     } catch (err) {
@@ -76,7 +67,7 @@ function Login() {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="login-page">
 
       {/* Animated Background */}
 
@@ -90,9 +81,20 @@ function Login() {
       <div style={styles.particleFour}>✦</div>
       <div style={styles.particleFive}>•</div>
 
+      {/* Back to Home */}
+
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        style={styles.backHome}
+        className="back-home"
+      >
+        ← Back to Home
+      </button>
+
       {/* Brand */}
 
-      <div style={styles.brand}>
+      <div style={styles.brand} className="login-brand">
 
         <div style={styles.logo}>
           ₿
@@ -112,7 +114,7 @@ function Login() {
 
       {/* Login Card */}
 
-      <div style={styles.card}>
+      <div style={styles.card} className="login-card">
 
         <div style={styles.cardHeader}>
 
@@ -366,6 +368,52 @@ function Login() {
             color: #93c5fd !important;
           }
 
+          .back-home {
+            transition:
+              background .2s ease,
+              border-color .2s ease,
+              color .2s ease,
+              transform .2s ease;
+          }
+
+          .back-home:hover {
+            background: rgba(37,99,235,.15);
+            border-color: rgba(96,165,250,.4);
+            color: #bfdbfe !important;
+            transform: translateY(-1px);
+          }
+
+          @media (max-width: 640px) {
+            .login-page {
+              padding: 95px 16px 40px !important;
+              align-items: flex-start !important;
+              min-height: 100vh;
+            }
+            .login-brand {
+              top: 20px !important;
+              left: 16px !important;
+              gap: 8px !important;
+            }
+            .login-brand h1 {
+              font-size: 18px !important;
+            }
+            .login-brand p {
+              display: none !important;
+            }
+            .back-home {
+              top: 20px !important;
+              right: 16px !important;
+              padding: 6px 12px !important;
+              font-size: 12px !important;
+            }
+            .login-card {
+              width: 100% !important;
+              max-width: 100% !important;
+              padding: 26px 20px !important;
+              margin-top: 15px;
+            }
+          }
+
         `}
       </style>
 
@@ -479,6 +527,31 @@ const styles = {
     fontSize: "18px",
     animation:
       "pulse 5.5s ease-in-out infinite",
+  },
+
+  backHome: {
+    position: "absolute",
+    top: "32px",
+    right: "50px",
+    zIndex: 10,
+
+    padding: "9px 16px",
+    borderRadius: "8px",
+
+    border:
+      "1px solid rgba(147,197,253,.2)",
+
+    background:
+      "rgba(15,23,42,.45)",
+
+    color: "#93c5fd",
+    fontSize: "13px",
+    fontWeight: "600",
+
+    cursor: "pointer",
+
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
   },
 
   brand: {

@@ -81,3 +81,25 @@ class TokenResponse(BaseModel):
 
     # User's role
     role: str
+
+
+# --------------------------------------------------
+# Admin - User Response Model
+# --------------------------------------------------
+
+class UserResponse(BaseModel):
+
+    name: str
+    email: EmailStr
+    role: str
+
+
+# --------------------------------------------------
+# Admin - Role Update Model
+# --------------------------------------------------
+
+class RoleUpdate(BaseModel):
+
+    role: str = Field(
+        description="User role: user, analyst, or admin"
+    )

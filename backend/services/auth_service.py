@@ -8,8 +8,10 @@ from jose import JWTError, jwt
 # Import password hashing library
 from passlib.context import CryptContext
 
+from typing import Optional
+
 # Import FastAPI tools
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 
 # Import OAuth2 Password Bearer Authentication
 from fastapi.security import OAuth2PasswordBearer
@@ -129,21 +131,24 @@ def get_current_user(
         # Check token validity
         if email is None:
             raise HTTPException(
-                status_code=401,
-                detail="Invalid token"
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+                headers={"WWW-Authenticate": "Bearer"}
             )
 
         # Return user information
         return {
             "email": email,
-            "role": role
+            "role": role,
+            "name": payload.get("name", "User")
         }
 
     except JWTError:
 
         raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
 

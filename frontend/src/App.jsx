@@ -1,12 +1,20 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
+// Pages
+import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
-
 import Alerts from "./pages/Alerts";
+import Admin from "./pages/Admin";
+
+// Components
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -15,7 +23,14 @@ function App() {
   return (
     <Routes>
 
-      {/* Public */}
+      {/* ========================================= */}
+      {/* PUBLIC PAGES */}
+      {/* ========================================= */}
+
+      <Route
+        path="/"
+        element={<Home />}
+      />
 
       <Route
         path="/login"
@@ -28,7 +43,9 @@ function App() {
       />
 
 
-      {/* Protected Application */}
+      {/* ========================================= */}
+      {/* PROTECTED APPLICATION */}
+      {/* ========================================= */}
 
       <Route
         element={
@@ -61,25 +78,29 @@ function App() {
       </Route>
 
 
-      {/* Default */}
+      {/* ========================================= */}
+      {/* ADMIN PAGE */}
+      {/* ========================================= */}
 
       <Route
-        path="/"
+        path="/admin"
         element={
-          <Navigate
-            to="/login"
-            replace
-          />
+          <ProtectedRoute adminOnly>
+            <Admin />
+          </ProtectedRoute>
         }
       />
 
-      {/* Unknown */}
+
+      {/* ========================================= */}
+      {/* UNKNOWN ROUTES */}
+      {/* ========================================= */}
 
       <Route
         path="*"
         element={
           <Navigate
-            to="/login"
+            to="/"
             replace
           />
         }

@@ -1,0 +1,766 @@
+/* ==================================================
+   ADMIN PAGE
+================================================== */
+
+.admin-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  color: #172554;
+  font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+
+/* ==================================================
+   HEADER
+================================================== */
+
+.admin-header {
+  height: 78px;
+  padding: 0 40px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  box-sizing: border-box;
+
+  background: rgba(255, 255, 255, 0.9);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.15);
+
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+}
+
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.admin-logo {
+  width: 46px;
+  height: 46px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 12px;
+
+  background: linear-gradient(135deg, #2563eb, #38bdf8);
+
+  color: white;
+  font-size: 25px;
+  font-weight: 700;
+
+  box-shadow: 0 7px 20px rgba(37, 99, 235, 0.3);
+}
+
+.admin-brand h1 {
+  margin: 0;
+
+  font-size: 21px;
+  font-weight: 750;
+
+  color: #172554;
+}
+
+.admin-brand p {
+  margin: 3px 0 0;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+
+/* ==================================================
+   HEADER BUTTONS
+================================================== */
+
+.back-button,
+.logout-button {
+  border-radius: 9px;
+  padding: 10px 16px;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.back-button {
+  border: 1px solid #bfdbfe;
+  background: white;
+  color: #1d4ed8;
+}
+
+.back-button:hover {
+  background: #eff6ff;
+}
+
+.logout-button {
+  border: none;
+  background: #1d4ed8;
+  color: white;
+
+  box-shadow: 0 5px 15px rgba(37, 99, 235, 0.2);
+}
+
+.logout-button:hover {
+  background: #1e40af;
+}
+
+
+/* ==================================================
+   MAIN CONTAINER
+================================================== */
+
+.admin-container {
+  width: min(1200px, calc(100% - 60px));
+
+  margin: 0 auto;
+
+  padding: 45px 0 60px;
+}
+
+
+/* ==================================================
+   PAGE HEADING
+================================================== */
+
+.admin-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 30px;
+
+  margin-bottom: 30px;
+}
+
+.admin-label {
+  display: inline-block;
+
+  margin-bottom: 8px;
+
+  font-size: 11px;
+  font-weight: 800;
+
+  letter-spacing: 1.6px;
+
+  color: #2563eb;
+}
+
+.admin-heading h2 {
+  margin: 0;
+
+  font-size: 32px;
+  font-weight: 750;
+
+  color: #172554;
+}
+
+.admin-heading p {
+  margin: 8px 0 0;
+
+  font-size: 14px;
+  color: #64748b;
+}
+
+
+/* ==================================================
+   USER COUNT
+================================================== */
+
+.user-count-card {
+  min-width: 165px;
+
+  padding: 18px 22px;
+
+  border-radius: 14px;
+
+  background: white;
+
+  border: 1px solid #dbeafe;
+
+  box-shadow: 0 8px 25px rgba(30, 64, 175, 0.08);
+
+  text-align: center;
+}
+
+.user-count-card span {
+  display: block;
+
+  margin-bottom: 5px;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.user-count-card strong {
+  display: block;
+
+  font-size: 30px;
+
+  color: #2563eb;
+}
+
+
+/* ==================================================
+   MESSAGES
+================================================== */
+
+.admin-message {
+  margin-bottom: 20px;
+
+  padding: 13px 16px;
+
+  border-radius: 9px;
+
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.error-message {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.success-message {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+
+/* ==================================================
+   USERS CARD
+================================================== */
+
+.users-card {
+  overflow: hidden;
+
+  border-radius: 16px;
+
+  background: white;
+
+  border: 1px solid #dbeafe;
+
+  box-shadow: 0 10px 35px rgba(30, 64, 175, 0.08);
+}
+
+.users-card-header {
+  padding: 24px 26px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 20px;
+
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.users-card-header h3 {
+  margin: 0;
+
+  font-size: 18px;
+  color: #172554;
+}
+
+.users-card-header p {
+  margin: 5px 0 0;
+
+  font-size: 12px;
+  color: #64748b;
+}
+
+.refresh-button {
+  padding: 10px 15px;
+
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+
+  background: #eff6ff;
+  color: #1d4ed8;
+
+  font-size: 13px;
+  font-weight: 650;
+
+  cursor: pointer;
+}
+
+.refresh-button:hover {
+  background: #dbeafe;
+}
+
+.refresh-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ==================================================
+   TABLE
+================================================== */
+
+.users-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+
+  border-collapse: collapse;
+
+  font-size: 13px;
+}
+
+.users-table th {
+  padding: 15px 18px;
+
+  text-align: left;
+
+  background: #f8fafc;
+
+  color: #64748b;
+
+  font-size: 11px;
+  font-weight: 750;
+
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.users-table td {
+  padding: 17px 18px;
+
+  border-bottom: 1px solid #f1f5f9;
+
+  color: #334155;
+}
+
+.users-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.users-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.user-number {
+  width: 40px;
+
+  color: #94a3b8 !important;
+
+  font-weight: 700;
+}
+
+
+/* ==================================================
+   EMAIL CELL
+================================================== */
+
+.email-cell {
+  display: flex;
+  align-items: center;
+
+  gap: 10px;
+
+  min-width: 230px;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #dbeafe;
+
+  color: #1d4ed8;
+
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.email-cell span {
+  font-weight: 600;
+  color: #334155;
+}
+
+
+/* ==================================================
+   ROLE BADGES
+================================================== */
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+
+  padding: 5px 10px;
+
+  border-radius: 20px;
+
+  font-size: 11px;
+  font-weight: 750;
+
+  text-transform: capitalize;
+}
+
+.role-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.role-badge.user {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.role-badge.analyst {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.role-badge.admin {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+
+/* ==================================================
+   ROLE SELECT
+================================================== */
+
+.role-select {
+  min-width: 115px;
+
+  padding: 8px 10px;
+
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+
+  background: white;
+
+  color: #334155;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  outline: none;
+}
+
+.role-select:focus {
+  border-color: #3b82f6;
+
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.role-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ==================================================
+   STATUS
+================================================== */
+
+.active-status {
+  color: #16a34a;
+
+  font-size: 12px;
+  font-weight: 650;
+
+  white-space: nowrap;
+}
+
+.updating {
+  color: #2563eb;
+
+  font-size: 12px;
+  font-weight: 650;
+
+  white-space: nowrap;
+}
+
+
+/* ==================================================
+   LOADING
+================================================== */
+
+.admin-loading {
+  min-height: 260px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  color: #64748b;
+}
+
+.admin-loading p {
+  margin-top: 14px;
+
+  font-size: 13px;
+}
+
+.loader {
+  width: 32px;
+  height: 32px;
+
+  border: 3px solid #dbeafe;
+  border-top-color: #2563eb;
+
+  border-radius: 50%;
+
+  animation: admin-spin 0.8s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+/* ==================================================
+   EMPTY STATE
+================================================== */
+
+.empty-state {
+  min-height: 260px;
+
+  display: flex;
+  flex-direction: column;
+
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 42px;
+
+  margin-bottom: 12px;
+}
+
+.empty-state h3 {
+  margin: 0;
+
+  font-size: 17px;
+
+  color: #334155;
+}
+
+.empty-state p {
+  margin: 7px 0 0;
+
+  font-size: 13px;
+
+  color: #94a3b8;
+}
+
+
+/* ==================================================
+   ROLE INFORMATION
+================================================== */
+
+.role-info {
+  margin-top: 35px;
+}
+
+.role-info-heading {
+  margin-bottom: 18px;
+}
+
+.role-info-heading h3 {
+  margin: 0;
+
+  font-size: 21px;
+
+  color: #172554;
+}
+
+.role-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(3, 1fr);
+
+  gap: 18px;
+}
+
+.role-info-card {
+  display: flex;
+
+  gap: 14px;
+
+  padding: 21px;
+
+  border-radius: 14px;
+
+  background: rgba(255, 255, 255, 0.9);
+
+  border: 1px solid #dbeafe;
+
+  box-shadow: 0 7px 25px rgba(30, 64, 175, 0.06);
+}
+
+.role-info-icon {
+  width: 40px;
+  height: 40px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.user-icon {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.analyst-icon {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.admin-icon {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.role-info-card h4 {
+  margin: 1px 0 6px;
+
+  font-size: 15px;
+
+  color: #172554;
+}
+
+.role-info-card p {
+  margin: 0;
+
+  font-size: 12px;
+
+  line-height: 1.6;
+
+  color: #64748b;
+}
+
+
+/* ==================================================
+   FOOTER
+================================================== */
+
+.admin-footer {
+  padding: 22px;
+
+  text-align: center;
+
+  font-size: 11px;
+
+  color: #64748b;
+
+  border-top: 1px solid rgba(59, 130, 246, 0.12);
+
+  background: rgba(255, 255, 255, 0.5);
+}
+
+
+/* ==================================================
+   RESPONSIVE
+================================================== */
+
+@media (max-width: 850px) {
+
+  .admin-header {
+    padding: 0 20px;
+  }
+
+  .admin-container {
+    width: calc(100% - 30px);
+    padding-top: 30px;
+  }
+
+  .admin-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .user-count-card {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .role-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+@media (max-width: 600px) {
+
+  .admin-header {
+    height: auto;
+    padding: 18px;
+
+    align-items: flex-start;
+    gap: 15px;
+
+    flex-direction: column;
+  }
+
+  .admin-header-actions {
+    width: 100%;
+  }
+
+  .back-button,
+  .logout-button {
+    flex: 1;
+  }
+
+  .admin-heading h2 {
+    font-size: 27px;
+  }
+
+  .users-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .refresh-button {
+    width: 100%;
+  }
+}

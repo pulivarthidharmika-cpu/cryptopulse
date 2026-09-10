@@ -1,8 +1,10 @@
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 
 from models.user_model import UserSignup, TokenResponse
 from database.database import users_collection
+from config.settings import ADMIN_EMAIL
 from services.auth_service import (
     hash_password,
     verify_password,
@@ -23,8 +25,11 @@ router = APIRouter(
 @router.post("/signup")
 async def signup(user: UserSignup):
 
+    clean_email = user.email.strip().lower()
+    clean_name = user.name.strip()
+
     existing_user = await users_collection.find_one(
-        {"email": user.email}
+        {"email": {"$regex": f"^{re.escape(clean_email)}$", "$options": "i"}}
     )
 
     if existing_user:
@@ -38,8 +43,8 @@ async def signup(user: UserSignup):
     )
 
     new_user = {
-        "name": user.name,
-        "email": user.email,
+        "name": clean_name,
+        "email": clean_email,
         "hashed_password": hashed_password,
         "role": "pending"
     }
@@ -67,17 +72,24 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
 
-    email = form_data.username
+    clean_username = form_data.username.strip()
     password = form_data.password
 
+    # Support 'admin' alias or email address
+    if clean_username.lower() == "admin":
+        lookup_email = ADMIN_EMAIL.strip().lower()
+    else:
+        lookup_email = clean_username.lower()
+
     user = await users_collection.find_one(
-        {"email": email}
+        {"email": {"$regex": f"^{re.escape(lookup_email)}$", "$options": "i"}}
     )
 
     if not user:
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     # Verify password
@@ -87,7 +99,8 @@ async def login(
     ):
         raise HTTPException(
             status_code=401,
-            detail="Invalid email or password"
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     # Get role
@@ -100,7 +113,8 @@ async def login(
             detail=(
                 "Your account is waiting for role "
                 "assignment by an administrator."
-            )
+            ),
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     # Validate role
@@ -111,7 +125,8 @@ async def login(
     ]:
         raise HTTPException(
             status_code=403,
-            detail="Invalid user role."
+            detail="Invalid user role.",
+            headers={"WWW-Authenticate": "Bearer"}
         )
 
     # Create JWT token

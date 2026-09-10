@@ -32,13 +32,15 @@ services:
 
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
 
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
 
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,EXTERNAL://localhost:9092
 
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
 
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
@@ -64,34 +66,35 @@ services:
       - "8000:8000"
 
     environment:
+
+      # JWT
       ACCESS_TOKEN_EXPIRE_MINUTES: "30"
-
-      ADMIN_PASSWORD: admin123
-      ADMIN_USERNAME: admin
-
-      ALERTS_COLLECTION: alerts
-
+      SECRET_KEY: cryptopulse_secret_key_2026
       ALGORITHM: HS256
 
-      BITCOIN_ALERT_PRICE: "70000"
+      # Admin
+      ADMIN_EMAIL: dharmika@cryptopulse.com
+      ADMIN_PASSWORD: Admin@123
 
-      CURRENCY: usd
-
+      # MongoDB
+      MONGO_URI: mongodb://mongodb:27017
       DATABASE_NAME: cryptopulse_db
 
+      # MongoDB Collections
+      LIVE_PRICES_COLLECTION: live_prices
       HISTORICAL_PRICES_COLLECTION: historical_prices
+      ALERTS_COLLECTION: alerts
 
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-
+      # Kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC: crypto-prices
 
-      LIVE_PRICES_COLLECTION: live_prices
-
-      MONGO_URI: mongodb://mongodb:27017
-
-      SECRET_KEY: cryptopulse_secret_key_2026
-
+      # Cryptocurrency
       SUPPORTED_COINS: bitcoin,ethereum,solana
+      CURRENCY: usd
+
+      # Alerts
+      BITCOIN_ALERT_PRICE: "70000"
 
     depends_on:
       - mongodb
