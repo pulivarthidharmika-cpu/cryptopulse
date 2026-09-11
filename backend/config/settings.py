@@ -145,6 +145,14 @@ BINANCE_API_URL = os.getenv(
     "https://api.binance.com/api/v3"
 )
 
+# --------------------------------------------------
+# Binance WebSocket
+# --------------------------------------------------
+
+BINANCE_WS_URL = os.getenv(
+    "BINANCE_WS_URL",
+    "wss://stream.binance.com:9443/stream"
+)
 
 # --------------------------------------------------
 # CryptoCompare

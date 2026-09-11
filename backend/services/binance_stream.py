@@ -2,7 +2,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
-import websockets
+from config.settings import BINANCE_WS_URL
 
 from kafka_service.producer import publish_price
 from utils.logger import logger
@@ -12,8 +12,8 @@ from utils.logger import logger
 # BINANCE WEBSOCKET CONFIGURATION
 # ============================================================
 
-BINANCE_WS_URL = (
-    "wss://stream.binance.com:9443/stream?"
+BINANCE_STREAM_URL = (
+    f"{BINANCE_WS_URL}?"
     "streams=btcusdt@ticker/"
     "ethusdt@ticker/"
     "solusdt@ticker"
@@ -103,7 +103,7 @@ async def run_binance_stream():
         try:
 
             async with websockets.connect(
-                BINANCE_WS_URL,
+                BINANCE_STREAM_URL,
                 ping_interval=20,
                 ping_timeout=20,
             ) as websocket:
