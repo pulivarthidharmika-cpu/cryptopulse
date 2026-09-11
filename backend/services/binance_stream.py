@@ -1,5 +1,6 @@
 import asyncio
 import json
+import websockets
 from datetime import datetime, timezone
 
 from config.settings import BINANCE_WS_URL
@@ -145,8 +146,12 @@ async def run_binance_stream():
                     # Send the real-time tick through
                     # the existing Kafka Producer.
                     publish_price(
-                        price_record
-                    )
+                    price_record
+                )
+
+                logger.info(
+                f"Published {price_record['coin']} price to Kafka"
+            )
 
         except asyncio.CancelledError:
 
