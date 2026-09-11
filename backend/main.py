@@ -24,6 +24,7 @@ from routers.admin_routes import router as admin_router
 from services.api_fetcher import fetch_and_publish_prices
 from services.alert_engine import check_alerts
 from kafka_service.consumer import consume_messages
+from services.binance_stream import run_binance_stream
 
 from utils.logger import logger
 
@@ -155,6 +156,9 @@ async def startup_event():
         "Background services started successfully"
     )
 
+    asyncio.create_task(
+        run_binance_stream()
+    )
 
 # --------------------------------------------------
 # Home Endpoint
