@@ -12,9 +12,10 @@ function Dashboard() {
     localStorage.getItem("role") ||
     "User";
 
-  const [prices, setPrices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+ const [prices, setPrices] = useState([]);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState("");
+ const [wsStatus, setWsStatus] = useState("connecting");
 
   const fetchPrices = async () => {
     try {
@@ -50,31 +51,43 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-  const socket = createPriceWebSocket({
-    onMessage: (data) => {
-      setPrices((currentPrices) => {
-        const exists = currentPrices.some(
-          (item) => item.coin === data.coin
-        );
+   useEffect(() => {
+    const socket = createPriceWebSocket({
+      onOpen: () => {
+        setWsStatus("connected");
+      },
 
-        if (!exists) {
-          return [...currentPrices, data];
-        }
+      onMessage: (data) => {
+        setPrices((currentPrices) => {
+          const exists = currentPrices.some(
+            (item) => item.coin === data.coin
+          );
 
-        return currentPrices.map((item) =>
-          item.coin === data.coin
-            ? { ...item, ...data }
-            : item
-        );
-      });
-    },
-  });
+          if (!exists) {
+            return [...currentPrices, data];
+          }
 
-  return () => {
-    socket.close();
-  };
-}, []);
+          return currentPrices.map((item) =>
+            item.coin === data.coin
+              ? { ...item, ...data }
+              : item
+          );
+        });
+      },
+
+      onClose: () => {
+        setWsStatus("disconnected");
+      },
+
+      onError: () => {
+        setWsStatus("disconnected");
+      },
+    });
+
+    return () => {
+      socket.close();
+    };
+  }, []);
 
   const formatPrice = (price) => {
     return Number(price).toLocaleString("en-US", {
@@ -274,8 +287,13 @@ function Dashboard() {
 
             </div>
 
-           <span className="updated">
-             ● Live WebSocket Updates
+          <span className={`updated ws-status ${wsStatus}`}>
+            ●{" "}
+            {wsStatus === "connected"
+            ? "WebSocket Connected"
+            : wsStatus === "connecting"
+            ? "WebSocket Connecting..."
+            : "WebSocket Disconnected"}
           </span>
 
           </div>
@@ -686,6 +704,22 @@ function Dashboard() {
             font-size: 13px;
             font-weight: 600;
           }
+
+          .ws-status {
+            transition: color 0.25s ease;
+          }
+
+          .ws-status.connected {
+            color: #16a34a;
+          }
+
+          .ws-status.connecting {
+           color: #ca8a04;
+          }
+
+.ws-status.disconnected {
+  color: #dc2626;
+}
 
 
           /* ================= CARDS ================= */
