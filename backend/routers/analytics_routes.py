@@ -125,6 +125,67 @@ def detect_volume_spike(volumes, threshold=2):
 
 
 # ==================================================
+# TOP GAINERS / TOP LOSERS
+# ==================================================
+
+def calculate_gainers_and_losers(records):
+    """
+    Calculate top gaining and losing coins
+    from the latest historical price records.
+    """
+
+    market_data = []
+
+    for coin in SUPPORTED_COINS:
+
+        coin_records = [
+            item
+            for item in records
+            if item.get("coin") == coin
+            and item.get("price") is not None
+        ]
+
+        if len(coin_records) < 2:
+            continue
+
+        previous_price = coin_records[-2]["price"]
+        current_price = coin_records[-1]["price"]
+
+        if previous_price == 0:
+            continue
+
+        change_percentage = (
+            (current_price - previous_price)
+            / previous_price
+        ) * 100
+
+        market_data.append({
+            "coin": coin,
+            "price": current_price,
+            "change_percentage": round(
+                change_percentage,
+                2
+            )
+        })
+
+    gainers = sorted(
+        market_data,
+        key=lambda item: item["change_percentage"],
+        reverse=True
+    )
+
+    losers = sorted(
+        market_data,
+        key=lambda item: item["change_percentage"]
+    )
+
+    return {
+        "gainers": gainers,
+        "losers": losers
+    }
+
+
+# ==================================================
 # MAIN ANALYTICS API
 # GET /analytics/
 # ==================================================
@@ -143,6 +204,12 @@ async def get_analytics():
 
         async for document in cursor:
             records.append(document)
+
+        # Calculate top gainers and top losers
+        # using the same historical records loaded above.
+        gainers_and_losers = calculate_gainers_and_losers(
+            records
+        )
 
         analytics = {}
 
@@ -354,7 +421,10 @@ async def get_analytics():
             },
 
             "analytics":
-                analytics
+                analytics,
+
+            "gainers_and_losers":
+                gainers_and_losers
         }
 
     except Exception as e:
