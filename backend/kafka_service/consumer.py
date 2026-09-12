@@ -18,6 +18,7 @@ from config.settings import (
 )
 
 from utils.logger import logger
+from routers.price_routes import price_websocket_manager
 
 
 # ==================================================
@@ -241,6 +242,7 @@ async def process_message(
     if topic == KAFKA_TOPIC:
 
         await store_price(data)
+        await price_websocket_manager.broadcast(data)
 
     # --------------------------------------------------
     # Bitcoin price topic
@@ -249,6 +251,7 @@ async def process_message(
     elif topic == BTC_PRICE_TOPIC:
 
         await store_price(data)
+        await price_websocket_manager.broadcast(data)
 
     # --------------------------------------------------
     # Trade volume topic
