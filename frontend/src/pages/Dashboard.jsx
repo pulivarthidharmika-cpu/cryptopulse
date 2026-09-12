@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPriceWebSocket } from "../services/websocket";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -48,6 +49,32 @@ function Dashboard() {
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+  const socket = createPriceWebSocket({
+    onMessage: (data) => {
+      setPrices((currentPrices) => {
+        const exists = currentPrices.some(
+          (item) => item.coin === data.coin
+        );
+
+        if (!exists) {
+          return [...currentPrices, data];
+        }
+
+        return currentPrices.map((item) =>
+          item.coin === data.coin
+            ? { ...item, ...data }
+            : item
+        );
+      });
+    },
+  });
+
+  return () => {
+    socket.close();
+  };
+}, []);
 
   const formatPrice = (price) => {
     return Number(price).toLocaleString("en-US", {
@@ -247,9 +274,9 @@ function Dashboard() {
 
             </div>
 
-            <span className="updated">
-              ● Updates every 30 seconds
-            </span>
+           <span className="updated">
+             ● Live WebSocket Updates
+          </span>
 
           </div>
 
