@@ -7,36 +7,72 @@ export function createPriceWebSocket({
   onClose,
   onError,
 }) {
-  const websocket = new WebSocket(`${WS_BASE_URL}/prices/ws`);
+  let websocket = null;
+  let reconnectTimer = null;
+  let manuallyClosed = false;
 
-  websocket.onopen = () => {
-    console.log("Price WebSocket connected");
-    onOpen?.();
-  };
-
-  websocket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      onMessage?.(data);
-    } catch (error) {
-      console.error("Invalid WebSocket message:", error);
+  const connect = () => {
+    if (manuallyClosed) {
+      return;
     }
+
+    websocket = new WebSocket(`${WS_BASE_URL}/prices/ws`);
+
+    websocket.onopen = () => {
+      console.log("Price WebSocket connected");
+      onOpen?.();
+    };
+
+    websocket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        onMessage?.(data);
+      } catch (error) {
+        console.error("Invalid WebSocket message:", error);
+      }
+    };
+
+    websocket.onerror = (error) => {
+      console.error("Price WebSocket error:", error);
+      onError?.(error);
+    };
+
+    websocket.onclose = () => {
+      console.log("Price WebSocket disconnected");
+      onClose?.();
+
+      if (!manuallyClosed) {
+        reconnectTimer = setTimeout(() => {
+          console.log("Reconnecting to price WebSocket...");
+          connect();
+        }, 3000);
+      }
+    };
   };
 
-  websocket.onerror = (error) => {
-    console.error("Price WebSocket error:", error);
-    onError?.(error);
-  };
-
-  websocket.onclose = () => {
-    console.log("Price WebSocket disconnected");
-    onClose?.();
-  };
+  connect();
 
   return {
-    close: () => websocket.close(),
+    close: () => {
+      manuallyClosed = true;
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+
+      if (
+        websocket &&
+        websocket.readyState !== WebSocket.CLOSED
+      ) {
+        websocket.close();
+      }
+    },
+
     get readyState() {
-      return websocket.readyState;
+      return websocket
+        ? websocket.readyState
+        : WebSocket.CLOSED;
     },
   };
 }
