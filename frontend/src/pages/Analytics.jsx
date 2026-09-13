@@ -73,6 +73,10 @@ function Analytics() {
   const [timeframeLimit, setTimeframeLimit] = useState(60);
 
   const [selectedCoin, setSelectedCoin] = useState("bitcoin");
+  const [isStreaming, setIsStreaming] = useState(true);
+  const [pollInterval, setPollInterval] = useState(5000);
+  const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -219,13 +223,28 @@ function Analytics() {
 
 
   /* ============================================================
-     INITIAL LOAD + AUTO REFRESH
+     REFRESH ALL ANALYTICS
+  ============================================================ */
+
+  const refreshAll = async (showLoading = false) => {
+    setIsRefreshing(true);
+    await Promise.allSettled([
+      fetchHistory(showLoading),
+      fetchOHLC(),
+      fetchVolume(),
+      fetchComparative(),
+    ]);
+    setLastUpdated(new Date().toLocaleTimeString());
+    setIsRefreshing(false);
+  };
+
+
+  /* ============================================================
+     INITIAL LOAD
   ============================================================ */
 
   useEffect(() => {
-    fetchHistory(true);
-    fetchVolume();
-    fetchComparative();
+    refreshAll(true);
   }, []);
 
 
@@ -248,21 +267,20 @@ function Analytics() {
 
 
   /* ============================================================
-     AUTO REFRESH EVERY 5 SECONDS
+     LIVE POLLING INTERVAL (CONFIGURABLE & PAUSABLE)
   ============================================================ */
 
   useEffect(() => {
+    if (!isStreaming) return;
+
     const refreshInterval = setInterval(() => {
-      fetchHistory(false);
-      fetchOHLC();
-      fetchVolume();
-      fetchComparative();
-    }, 5000);
+      refreshAll(false);
+    }, pollInterval);
 
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [selectedCoin, timeframeLimit]);
+  }, [selectedCoin, timeframeLimit, ohlcInterval, isStreaming, pollInterval]);
 
 
   /* ============================================================
@@ -621,41 +639,99 @@ function Analytics() {
 
 
         <button
-          onClick={() => {
-            fetchHistory(true);
-            fetchOHLC();
-            fetchVolume();
-            fetchComparative();
+          onClick={() => refreshAll(true)}
+          disabled={isRefreshing}
+          style={{
+            ...styles.refreshButton,
+            opacity: isRefreshing ? 0.7 : 1,
+            cursor: isRefreshing ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
-          style={styles.refreshButton}
         >
-          ↻ Refresh
+          <span style={{ display: "inline-block", transform: isRefreshing ? "rotate(180deg)" : "none", transition: "transform 0.5s ease" }}>
+            ↻
+          </span>
+          {isRefreshing ? "Refreshing..." : "Refresh"}
         </button>
 
       </div>
 
 
       {/* ========================================================
-          LIVE STATUS
+          LIVE STREAMING & POLLING CONTROLS TOOLBAR
       ======================================================== */}
 
       <div
         style={{
-          ...styles.liveStatus,
+          ...styles.liveToolbar,
           backgroundColor: colors.card,
-          border:
-            `1px solid ${colors.border}`,
-          color: colors.muted,
+          border: `1px solid ${colors.border}`,
+          boxShadow: colors.shadow,
         }}
       >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          {/* Status badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                ...styles.liveDot,
+                backgroundColor: isStreaming ? "#22c55e" : "#f59e0b",
+                boxShadow: isStreaming ? "0 0 8px rgba(34, 197, 94, 0.6)" : "none",
+              }}
+            ></span>
+            <span style={{ fontSize: "13px", fontWeight: "600", color: isStreaming ? colors.title : "#f59e0b" }}>
+              {isStreaming ? "Live Polling Active" : "Polling Paused"}
+            </span>
+          </div>
 
-        <span
-          style={styles.liveDot}
-        ></span>
+          {/* Pause / Resume Button */}
+          <button
+            onClick={() => setIsStreaming(!isStreaming)}
+            style={{
+              padding: "5px 12px",
+              borderRadius: "6px",
+              border: `1px solid ${isStreaming ? (isDark ? "#ef4444" : "#fca5a5") : (isDark ? "#22c55e" : "#86efac")}`,
+              backgroundColor: isStreaming
+                ? (isDark ? "rgba(239, 68, 68, 0.15)" : "#fee2e2")
+                : (isDark ? "rgba(34, 197, 94, 0.15)" : "#dcfce7"),
+              color: isStreaming ? (isDark ? "#fca5a5" : "#b91c1c") : (isDark ? "#4ade80" : "#15803d"),
+              fontSize: "12px",
+              fontWeight: "600",
+              cursor: "pointer",
+            }}
+          >
+            {isStreaming ? "⏸ Pause Polling" : "▶ Resume Polling"}
+          </button>
 
-        Live analytics · Updates
-        automatically every 5 seconds
+          {/* Polling Interval Selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "12px", color: colors.muted }}>
+              Interval:
+            </span>
+            {[
+              { label: "3s", value: 3000 },
+              { label: "5s", value: 5000 },
+              { label: "15s", value: 15000 },
+              { label: "30s", value: 30000 },
+            ].map(({ label, value }) => (
+              <button
+                key={value}
+                onClick={() => setPollInterval(value)}
+                style={styles.timeframeButton(pollInterval === value, isDark)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        {/* Last synced timestamp */}
+        <div style={{ fontSize: "12px", color: colors.muted, display: "flex", alignItems: "center", gap: "6px" }}>
+          <span>⏱ Last Synced:</span>
+          <strong style={{ color: colors.title }}>{lastUpdated}</strong>
+        </div>
       </div>
 
 
@@ -1825,6 +1901,19 @@ const styles = {
     borderRadius: "20px",
     fontSize: "12px",
     marginBottom: "20px",
+  },
+
+
+  liveToolbar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: "14px",
+    padding: "12px 18px",
+    borderRadius: "10px",
+    marginBottom: "20px",
+    transition: "background-color 0.25s ease",
   },
 
 
