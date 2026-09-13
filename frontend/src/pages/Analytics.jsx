@@ -1819,6 +1819,36 @@ function Analytics() {
         </>
       )}
 
+      <style>
+        {`
+          @media (max-width: 800px) {
+            .analytics-container {
+              padding: 20px 16px 36px !important;
+            }
+
+            .analytics-header {
+              flex-direction: column !important;
+              align-items: flex-start !important;
+              gap: 12px !important;
+            }
+
+            .analytics-header h1 {
+              font-size: 24px !important;
+            }
+
+            .analytics-select {
+              width: 100% !important;
+            }
+          }
+
+          @media (max-width: 500px) {
+            .analytics-container {
+              padding: 14px 10px 28px !important;
+            }
+          }
+        `}
+      </style>
+
     </div>
   );
 }

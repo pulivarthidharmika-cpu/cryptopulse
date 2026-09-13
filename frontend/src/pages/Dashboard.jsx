@@ -2448,7 +2448,17 @@ function Dashboard() {
 
           /* ================= RESPONSIVE ================= */
 
+          @media (max-width: 1024px) {
+            .cards {
+              grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+              gap: 20px;
+            }
+          }
+
           @media (max-width: 800px) {
+            .dashboard-page {
+              padding: 24px 20px 40px;
+            }
 
             .page-header,
             .market-banner,
@@ -2456,7 +2466,11 @@ function Dashboard() {
             .summary {
               flex-direction: column;
               align-items: flex-start;
-              gap: 20px;
+              gap: 18px;
+            }
+
+            .title-row h1 {
+              font-size: 28px;
             }
 
             .header-right {
@@ -2466,23 +2480,63 @@ function Dashboard() {
 
             .banner-stats {
               width: 100%;
-              flex-wrap: wrap;
-              gap: 20px;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 16px;
             }
 
             .summary-right {
-              flex-wrap: wrap;
-              gap: 20px;
+              width: 100%;
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 16px;
             }
 
+            .cards {
+              grid-template-columns: 1fr;
+            }
+
+            .intelligence-banner {
+              flex-direction: column;
+              align-items: stretch;
+              gap: 16px;
+            }
           }
 
           @media (max-width: 500px) {
+            .dashboard-page {
+              padding: 16px 14px 30px;
+            }
+
+            .title-row h1 {
+              font-size: 24px;
+            }
 
             .user-details {
               display: none;
             }
 
+            .banner-stats {
+              grid-template-columns: 1fr;
+            }
+
+            .summary-right {
+              grid-template-columns: 1fr;
+            }
+
+            .live-alert-card {
+              flex-direction: column;
+              align-items: flex-start;
+              gap: 10px;
+            }
+
+            .alert-dismiss-btn {
+              align-self: flex-end;
+            }
+
+            .coin-card {
+              padding: 18px;
+            }
           }
 
         `}
