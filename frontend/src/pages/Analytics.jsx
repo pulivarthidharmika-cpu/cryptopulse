@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -61,6 +64,7 @@ const BASE_URL =
 function Analytics() {
   const [history, setHistory] = useState([]);
   const [ohlc, setOhlc] = useState([]);
+  const [volumeData, setVolumeData] = useState(null);
 
   const [selectedCoin, setSelectedCoin] = useState("bitcoin");
 
@@ -177,11 +181,29 @@ function Analytics() {
 
 
   /* ============================================================
+     FETCH TRADING VOLUME ANALYTICS
+  ============================================================ */
+
+  const fetchVolume = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/analytics/volume`);
+      if (response.ok) {
+        const result = await response.json();
+        setVolumeData(result);
+      }
+    } catch (err) {
+      console.error("Volume fetch error:", err);
+    }
+  };
+
+
+  /* ============================================================
      INITIAL LOAD + AUTO REFRESH
   ============================================================ */
 
   useEffect(() => {
     fetchHistory(true);
+    fetchVolume();
   }, []);
 
 
@@ -202,6 +224,7 @@ function Analytics() {
     const refreshInterval = setInterval(() => {
       fetchHistory(false);
       fetchOHLC();
+      fetchVolume();
     }, 5000);
 
     return () => {
@@ -293,6 +316,45 @@ function Analytics() {
   const coinName =
     selectedCoin.charAt(0).toUpperCase() +
     selectedCoin.slice(1);
+
+
+  /* ============================================================
+     VOLUME DATA & FORMATTING
+  ============================================================ */
+
+  const formatVolume = (val) => {
+    if (val === null || val === undefined || isNaN(val)) return "N/A";
+    const num = Number(val);
+    if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
+    if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+    if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
+    return `$${num.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  };
+
+  const volumeChartData = (volumeData?.coins || []).map((item) => ({
+    name: item.coin.charAt(0).toUpperCase() + item.coin.slice(1),
+    coin: item.coin,
+    volume: item.latest_volume || 0,
+    share: item.volume_share || 0,
+    spike: item.volume_spike,
+    liquidity: item.liquidity_rating,
+  }));
+
+  const coinColors = {
+    bitcoin: "#f59e0b",
+    ethereum: "#6366f1",
+    solana: "#14b8a6",
+  };
+
+  const selectedCoinVolume = volumeData?.coins?.find(
+    (c) => c.coin === selectedCoin
+  );
+
+  const spikeCoins = (volumeData?.coins || []).filter((c) => c.volume_spike);
+  const hasVolumeSpike = spikeCoins.length > 0;
+  const spikeCoinNames = spikeCoins.map(
+    (c) => c.coin.charAt(0).toUpperCase() + c.coin.slice(1)
+  );
 
 
   /* ============================================================
@@ -530,6 +592,7 @@ function Analytics() {
           onClick={() => {
             fetchHistory(true);
             fetchOHLC();
+            fetchVolume();
           }}
           style={styles.refreshButton}
         >
@@ -881,6 +944,205 @@ function Analytics() {
 
             )}
 
+          </div>
+
+
+          {/* ======================================================
+              TRADING VOLUME DISTRIBUTION & LIQUIDITY
+          ====================================================== */}
+
+          <div
+            style={{
+              ...styles.chartContainer,
+              backgroundColor: colors.card,
+              border: `1px solid ${colors.border}`,
+              boxShadow: colors.shadow,
+            }}
+          >
+            <div style={styles.chartHeader}>
+              <div>
+                <h2
+                  style={{
+                    ...styles.sectionTitle,
+                    color: colors.title,
+                  }}
+                >
+                  Cross-Asset Trading Volume & Liquidity
+                </h2>
+                <p
+                  style={{
+                    ...styles.chartSubtitle,
+                    color: colors.muted,
+                  }}
+                >
+                  24-hour volume distribution, volume-to-market-cap ratio, and spike detection
+                </p>
+              </div>
+            </div>
+
+            {/* Volume Spike Alert Banner if active */}
+            {hasVolumeSpike && (
+              <div
+                style={{
+                  backgroundColor: isDark ? "rgba(239, 68, 68, 0.15)" : "#fee2e2",
+                  border: `1px solid ${isDark ? "#ef4444" : "#fca5a5"}`,
+                  borderRadius: "8px",
+                  padding: "10px 16px",
+                  marginBottom: "18px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  color: isDark ? "#fca5a5" : "#b91c1c",
+                  fontSize: "14px",
+                  fontWeight: "600",
+                }}
+              >
+                <span>⚡ Volume Surge Alert:</span>
+                <span>
+                  Unusual trading volume detected on {spikeCoinNames.join(", ")} (&gt;150% of recent average).
+                </span>
+              </div>
+            )}
+
+            {/* Selected coin volume metrics */}
+            <div style={styles.volumeGrid}>
+              <div
+                style={{
+                  ...styles.volumeCard,
+                  backgroundColor: colors.cardSecondary,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                <span style={{ ...styles.statLabel, color: colors.muted }}>
+                  {coinName} 24h Volume
+                </span>
+                <strong style={{ ...styles.statValue, color: colors.title }}>
+                  {formatVolume(selectedCoinVolume?.latest_volume)}
+                </strong>
+                <span style={{ fontSize: "12px", color: colors.muted, marginTop: "4px" }}>
+                  Share: {selectedCoinVolume?.volume_share || 0}%
+                </span>
+              </div>
+
+              <div
+                style={{
+                  ...styles.volumeCard,
+                  backgroundColor: colors.cardSecondary,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                <span style={{ ...styles.statLabel, color: colors.muted }}>
+                  Vol / MCap Ratio
+                </span>
+                <strong style={{ ...styles.statValue, color: colors.title }}>
+                  {selectedCoinVolume?.volume_to_market_cap_pct !== undefined
+                    ? `${selectedCoinVolume.volume_to_market_cap_pct}%`
+                    : "N/A"}
+                </strong>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    marginTop: "4px",
+                    color:
+                      selectedCoinVolume?.liquidity_rating === "High Liquidity"
+                        ? "#16a34a"
+                        : selectedCoinVolume?.liquidity_rating === "Moderate Liquidity"
+                        ? "#f59e0b"
+                        : "#dc2626",
+                  }}
+                >
+                  {selectedCoinVolume?.liquidity_rating || "N/A"}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  ...styles.volumeCard,
+                  backgroundColor: colors.cardSecondary,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                <span style={{ ...styles.statLabel, color: colors.muted }}>
+                  Market Volume Leader
+                </span>
+                <strong
+                  style={{
+                    ...styles.statValue,
+                    color: "#f59e0b",
+                    textTransform: "capitalize",
+                  }}
+                >
+                  {volumeData?.volume_leader || "N/A"}
+                </strong>
+                <span style={{ fontSize: "12px", color: colors.muted, marginTop: "4px" }}>
+                  Total Market: {formatVolume(volumeData?.total_volume)}
+                </span>
+              </div>
+
+              <div
+                style={{
+                  ...styles.volumeCard,
+                  backgroundColor: colors.cardSecondary,
+                  border: `1px solid ${colors.border}`,
+                }}
+              >
+                <span style={{ ...styles.statLabel, color: colors.muted }}>
+                  {coinName} Spike Status
+                </span>
+                <strong
+                  style={{
+                    ...styles.statValue,
+                    color: selectedCoinVolume?.volume_spike ? "#ef4444" : "#16a34a",
+                  }}
+                >
+                  {selectedCoinVolume?.volume_spike ? "Surge Detected" : "Normal"}
+                </strong>
+                <span style={{ fontSize: "12px", color: colors.muted, marginTop: "4px" }}>
+                  Avg: {formatVolume(selectedCoinVolume?.average_volume)}
+                </span>
+              </div>
+            </div>
+
+            {/* Comparative Bar Chart */}
+            <div style={{ ...styles.chart, height: "300px", marginTop: "20px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={volumeChartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke={isDark ? "#334155" : "#e5e7eb"}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    stroke={isDark ? "#94a3b8" : "#6b7280"}
+                  />
+                  <YAxis
+                    stroke={isDark ? "#94a3b8" : "#6b7280"}
+                    tickFormatter={(val) => formatVolume(val)}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: colors.card,
+                      border: `1px solid ${colors.border}`,
+                      color: colors.title,
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value, name, props) => [
+                      `${formatVolume(value)} (${props?.payload?.share || 0}% share)`,
+                      "Volume",
+                    ]}
+                  />
+                  <Bar dataKey="volume" radius={[6, 6, 0, 0]}>
+                    {volumeChartData.map((entry) => (
+                      <Cell
+                        key={entry.coin}
+                        fill={coinColors[entry.coin] || "#3b82f6"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
 
@@ -1341,6 +1603,25 @@ const styles = {
 
   statValue: {
     fontSize: "22px",
+  },
+
+
+  volumeGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "14px",
+    marginBottom: "15px",
+  },
+
+
+  volumeCard: {
+    padding: "16px",
+    borderRadius: "8px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    transition: "background-color 0.25s ease",
   },
 
 
