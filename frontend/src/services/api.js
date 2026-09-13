@@ -164,7 +164,18 @@ export async function getPriceHistory() {
 
 export async function checkBackendHealth() {
   return apiRequest(
-    "/prices/health"
+    "/health"
+  );
+}
+
+
+/* ---------------------------------------------
+   Detailed System Health Diagnostics
+--------------------------------------------- */
+
+export async function getDetailedHealth() {
+  return apiRequest(
+    "/health/detailed"
   );
 }
 

@@ -20,6 +20,7 @@ from routers.analytics_routes import router as analytics_router
 from routers.alert_routes import router as alert_router
 from routers.auth_routes import router as auth_router
 from routers.admin_routes import router as admin_router
+from routers.health_routes import router as health_router
 
 from services.api_fetcher import fetch_and_publish_prices
 from services.alert_engine import check_alerts
@@ -186,24 +187,6 @@ async def home():
     }
 
 
-# --------------------------------------------------
-# Health Check
-# --------------------------------------------------
-
-@app.get("/health")
-async def health_check():
-
-    logger.info(
-        "Health check endpoint called"
-    )
-
-    return {
-
-        "status": "healthy",
-
-        "message": "CryptoPulse API is running"
-
-    }
 
 
 # --------------------------------------------------
@@ -228,6 +211,10 @@ app.include_router(
 
 app.include_router(
     admin_router
+)
+
+app.include_router(
+    health_router
 )
 
 

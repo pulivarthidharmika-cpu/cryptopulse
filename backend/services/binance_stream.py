@@ -93,6 +93,20 @@ def build_price_record(data: dict):
 # BINANCE REAL-TIME STREAM
 # ============================================================
 
+_stream_status = {
+    "status": "idle",
+    "connected": False,
+    "last_tick_time": None,
+    "tick_count": 0,
+    "last_error": None
+}
+
+
+def get_stream_status() -> dict:
+    """Return operational health and tick count of Binance WebSocket stream."""
+    return dict(_stream_status)
+
+
 async def run_binance_stream():
     """
     Connect to Binance WebSocket and continuously
@@ -106,6 +120,7 @@ async def run_binance_stream():
     while True:
 
         try:
+            _stream_status["status"] = "connecting"
 
             async with websockets.connect(
                 BINANCE_STREAM_URL,
@@ -116,6 +131,9 @@ async def run_binance_stream():
                 logger.info(
                     "Binance WebSocket connected successfully"
                 )
+                _stream_status["status"] = "streaming"
+                _stream_status["connected"] = True
+                _stream_status["last_error"] = None
 
                 while True:
 
@@ -141,6 +159,9 @@ async def run_binance_stream():
                     if not price_record:
                         continue
 
+                    _stream_status["last_tick_time"] = datetime.now(timezone.utc).isoformat()
+                    _stream_status["tick_count"] += 1
+
                     logger.info(
                         f"Live Binance tick: "
                         f"{price_record['coin']} = "
@@ -150,15 +171,17 @@ async def run_binance_stream():
                     # Send the real-time tick through
                     # the existing Kafka Producer.
                     publish_price(
-                    price_record
-                )
+                        price_record
+                    )
 
-                logger.info(
-                f"Published {price_record['coin']} price to Kafka"
-            )
+                    logger.info(
+                        f"Published {price_record['coin']} price to Kafka"
+                    )
 
         except asyncio.CancelledError:
 
+            _stream_status["connected"] = False
+            _stream_status["status"] = "stopped"
             logger.info(
                 "Binance WebSocket stream cancelled"
             )
@@ -166,6 +189,10 @@ async def run_binance_stream():
             raise
 
         except Exception as e:
+
+            _stream_status["connected"] = False
+            _stream_status["status"] = "reconnecting"
+            _stream_status["last_error"] = str(e)
 
             logger.warning(
                 f"Binance WebSocket connection error: "
