@@ -172,6 +172,35 @@ async def store_market_alert(data: dict):
 # ==================================================
 
 _consumer = None
+_stop_event = asyncio.Event()
+CONSUMER_DEAD_LETTERS = []
+MAX_DLQ_SIZE = 100
+
+
+def safe_deserialize(message_bytes: bytes):
+    """Safely decode JSON Kafka message without throwing uncaught exceptions on corrupt payloads."""
+    try:
+        return json.loads(message_bytes.decode("utf-8"))
+    except Exception as e:
+        logger.error(f"Failed to deserialize Kafka message: {e}")
+        return {"_corrupt": True, "error": str(e), "raw": str(message_bytes[:200])}
+
+
+def get_consumer_status() -> dict:
+    """Return consumer health, active topics, and dead-letter statistics."""
+    topics = [
+        KAFKA_TOPIC,
+        BTC_PRICE_TOPIC,
+        TRADE_VOLUME_TOPIC,
+        MARKET_ALERTS_TOPIC
+    ]
+    return {
+        "status": "active" if _consumer is not None else "standby",
+        "bootstrap_servers": KAFKA_BOOTSTRAP_SERVERS,
+        "topics": list(dict.fromkeys(topics)),
+        "dead_letter_count": len(CONSUMER_DEAD_LETTERS),
+        "is_running": not _stop_event.is_set(),
+    }
 
 
 def get_consumer():
@@ -213,10 +242,7 @@ def get_consumer():
 
             consumer_timeout_ms=1000,
 
-            value_deserializer=lambda message:
-                json.loads(
-                    message.decode("utf-8")
-                )
+            value_deserializer=safe_deserialize
         )
 
         logger.info(
@@ -250,6 +276,23 @@ async def process_message(
     topic: str,
     data: dict
 ):
+
+    if not isinstance(data, dict):
+        logger.warning(f"Discarding non-dict payload from '{topic}': {data}")
+        return
+
+    # Check for payload corruption caught by safe_deserialize
+    if data.get("_corrupt"):
+        entry = {
+            "topic": topic,
+            "payload": data,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        if len(CONSUMER_DEAD_LETTERS) >= MAX_DLQ_SIZE:
+            CONSUMER_DEAD_LETTERS.pop(0)
+        CONSUMER_DEAD_LETTERS.append(entry)
+        logger.warning(f"Corrupted payload detected on topic '{topic}'. Routed to consumer DLQ.")
+        return
 
     logger.info(
         f"Received message from '{topic}': {data}"
@@ -309,7 +352,7 @@ async def consume_messages():
 
     loop = asyncio.get_running_loop()
 
-    while True:
+    while not _stop_event.is_set():
 
         try:
 
@@ -358,9 +401,10 @@ async def consume_messages():
 
 def close_consumer():
 
-    global _consumer
+    global _consumer, _stop_event
 
     try:
+        _stop_event.set()
 
         if _consumer is not None:
 

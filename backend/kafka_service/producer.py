@@ -18,7 +18,40 @@ from utils.logger import logger
 # Lazy & Resilient
 # ==================================================
 
+import time
+from datetime import datetime
+
 _producer = None
+DEAD_LETTER_QUEUE = []
+MAX_DLQ_SIZE = 100
+_last_producer_error = None
+
+
+def get_producer_status() -> dict:
+    """Return Kafka Producer operational health and dead-letter queue metrics."""
+    prod = get_producer()
+    return {
+        "status": "connected" if prod is not None else "disconnected",
+        "bootstrap_servers": KAFKA_BOOTSTRAP_SERVERS,
+        "dead_letter_count": len(DEAD_LETTER_QUEUE),
+        "last_error": _last_producer_error,
+    }
+
+
+def record_dead_letter(topic: str, data: dict, error: str):
+    """Store message that failed delivery after maximum retries."""
+    global _last_producer_error
+    _last_producer_error = error
+    entry = {
+        "topic": topic,
+        "payload": data,
+        "error": str(error),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    if len(DEAD_LETTER_QUEUE) >= MAX_DLQ_SIZE:
+        DEAD_LETTER_QUEUE.pop(0)
+    DEAD_LETTER_QUEUE.append(entry)
+    logger.error(f"Message routed to Dead-Letter Queue for topic '{topic}': {error}")
 
 
 def get_producer():
@@ -67,55 +100,57 @@ def get_producer():
 
 
 # ==================================================
-# HELPER - SEND MESSAGE
+# HELPER - SEND MESSAGE WITH RETRY & DEAD LETTER
 # ==================================================
 
 def _send_message(
     topic: str,
-    data: dict
-):
+    data: dict,
+    max_retries: int = 2
+) -> bool:
     """
-    Send a message to a Kafka topic.
+    Send a message to a Kafka topic with exponential retry backoff
+    and dead-letter queue routing on final failure.
 
     Returns:
         True  -> successful
         False -> failed
     """
+    global _producer
 
-    try:
+    for attempt in range(max_retries + 1):
+        try:
+            producer = get_producer()
 
-        producer = get_producer()
+            if producer is None:
+                if attempt < max_retries:
+                    time.sleep(0.2 * (2 ** attempt))
+                    continue
+                record_dead_letter(topic, data, "Kafka producer unavailable")
+                return False
 
-        if producer is None:
+            producer.send(topic, value=data)
+            producer.flush(timeout=2)
 
+            logger.info(
+                f"Kafka message published to '{topic}' (attempt {attempt + 1})"
+            )
+            return True
+
+        except Exception as e:
             logger.warning(
-                f"Kafka unavailable. "
-                f"Skipping message for topic '{topic}'"
+                f"Kafka publish attempt {attempt + 1}/{max_retries + 1} failed for "
+                f"topic '{topic}': {str(e)}"
             )
 
-            return False
+            if attempt < max_retries:
+                _producer = None
+                time.sleep(0.2 * (2 ** attempt))
+            else:
+                record_dead_letter(topic, data, str(e))
+                return False
 
-        producer.send(
-            topic,
-            value=data
-        )
-
-        producer.flush(timeout=2)
-
-        logger.info(
-            f"Kafka message published to '{topic}'"
-        )
-
-        return True
-
-    except Exception as e:
-
-        logger.warning(
-            f"Kafka publish failed for "
-            f"topic '{topic}': {str(e)}"
-        )
-
-        return False
+    return False
 
 
 # ==================================================
