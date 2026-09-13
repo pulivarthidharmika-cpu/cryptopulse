@@ -65,6 +65,8 @@ const BASE_URL =
 function Analytics() {
   const [history, setHistory] = useState([]);
   const [ohlc, setOhlc] = useState([]);
+  const [ohlcInterval, setOhlcInterval] = useState("1m");
+  const [ohlcSummary, setOhlcSummary] = useState(null);
   const [volumeData, setVolumeData] = useState(null);
   const [comparativeData, setComparativeData] = useState(null);
   const [chartMode, setChartMode] = useState("single");
@@ -155,7 +157,7 @@ function Analytics() {
   const fetchOHLC = async () => {
     try {
       const response = await fetch(
-        `${BASE_URL}/analytics/ohlc/${selectedCoin}`
+        `${BASE_URL}/analytics/ohlc/${selectedCoin}?interval=${ohlcInterval}`
       );
 
       if (!response.ok) {
@@ -166,12 +168,8 @@ function Analytics() {
 
       const result = await response.json();
 
-      console.log(
-        `${selectedCoin} OHLC data:`,
-        result
-      );
-
       setOhlc(result.data || []);
+      setOhlcSummary(result.summary || null);
     } catch (err) {
       console.error("OHLC fetch error:", err);
 
@@ -241,12 +239,12 @@ function Analytics() {
 
 
   /* ============================================================
-     OHLC FETCH WHEN COIN CHANGES
+     OHLC FETCH WHEN COIN OR INTERVAL CHANGES
   ============================================================ */
 
   useEffect(() => {
     fetchOHLC();
-  }, [selectedCoin]);
+  }, [selectedCoin, ohlcInterval]);
 
 
   /* ============================================================
@@ -421,7 +419,7 @@ function Analytics() {
   const candleChartData = {
     datasets: [
       {
-        label: `${coinName} 1-Minute Candles`,
+        label: `${coinName} ${ohlcInterval.toUpperCase()} Candles`,
 
         data: candlestickData,
 
@@ -923,7 +921,16 @@ function Analytics() {
             }}
           >
 
-            <div style={styles.chartHeader}>
+            <div
+              style={{
+                ...styles.chartHeader,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
 
               <div>
 
@@ -942,13 +949,84 @@ function Analytics() {
                     color: colors.muted,
                   }}
                 >
-                  1-minute OHLC candles ·
-                  Live updates enabled
+                  {ohlcInterval.toUpperCase()} OHLC Candles · Real-time aggregation & technical indicators
                 </p>
 
               </div>
 
+              {/* Timeframe Interval Selector */}
+              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <span style={{ fontSize: "12px", color: colors.muted, marginRight: "4px" }}>
+                  Interval:
+                </span>
+                {["1m", "5m", "15m", "1h"].map((intvl) => (
+                  <button
+                    key={intvl}
+                    onClick={() => setOhlcInterval(intvl)}
+                    style={styles.timeframeButton(ohlcInterval === intvl, isDark)}
+                  >
+                    {intvl.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
             </div>
+
+            {/* OHLC Technical Indicators Summary Ribbon */}
+            {ohlcSummary && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  padding: "10px 14px",
+                  borderRadius: "8px",
+                  backgroundColor: colors.cardSecondary,
+                  border: `1px solid ${colors.border}`,
+                  marginBottom: "18px",
+                  fontSize: "12px",
+                }}
+              >
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <span style={{ color: colors.muted }}>Candle Sentiment:</span>
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      backgroundColor: isDark ? "rgba(34, 197, 94, 0.2)" : "#dcfce7",
+                      color: "#16a34a",
+                      fontWeight: "700",
+                    }}
+                  >
+                    ▲ {ohlcSummary.bullish_candles} Bullish
+                  </span>
+                  <span
+                    style={{
+                      padding: "2px 8px",
+                      borderRadius: "4px",
+                      backgroundColor: isDark ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
+                      color: "#dc2626",
+                      fontWeight: "700",
+                    }}
+                  >
+                    ▼ {ohlcSummary.bearish_candles} Bearish
+                  </span>
+                </div>
+
+                <div style={{ width: "1px", height: "14px", backgroundColor: colors.border }}></div>
+
+                <span style={{ color: colors.muted }}>
+                  Range: <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.period_low)}</strong> – <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.period_high)}</strong>
+                </span>
+
+                <div style={{ width: "1px", height: "14px", backgroundColor: colors.border }}></div>
+
+                <span style={{ color: colors.muted }}>
+                  Avg Body: <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.avg_body_size)}</strong>
+                </span>
+              </div>
+            )}
 
 
             {candlestickData.length === 0 ? (

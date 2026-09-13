@@ -454,61 +454,41 @@ async def get_analytics():
 @router.get("/ohlc/{coin}")
 async def get_ohlc(
     coin: str,
-    limit: int = 500
+    limit: int = 500,
+    interval: str = "1m"
 ):
-
     try:
-
         coin = coin.strip().lower()
+        interval = interval.strip().lower()
+
+        valid_intervals = ["1m", "5m", "15m", "1h"]
+        if interval not in valid_intervals:
+            interval = "1m"
 
         # ------------------------------------------
         # Validate coin
         # ------------------------------------------
-
         if coin not in SUPPORTED_COINS:
-
             raise HTTPException(
                 status_code=400,
                 detail=(
                     f"Unsupported coin '{coin}'. "
-                    f"Supported coins: "
-                    f"{', '.join(SUPPORTED_COINS)}"
+                    f"Supported coins: {', '.join(SUPPORTED_COINS)}"
                 )
             )
 
-        # ------------------------------------------
-        # Protect the API from extremely large
-        # responses
-        # ------------------------------------------
-
-        limit = max(
-            1,
-            min(limit, 1000)
-        )
+        limit = max(1, min(limit, 1000))
 
         # ------------------------------------------
         # Fetch historical prices for selected coin
         # ------------------------------------------
-
         cursor = historical_prices_collection.find(
-            {
-                "coin": coin
-            },
-            {
-                "_id": 0,
-                "coin": 1,
-                "price": 1,
-                "timestamp": 1
-            }
-        ).sort(
-            "timestamp",
-            1
-        )
+            {"coin": coin},
+            {"_id": 0, "coin": 1, "price": 1, "timestamp": 1}
+        ).sort("timestamp", 1)
 
         records = []
-
         async for document in cursor:
-
             price = document.get("price")
             timestamp = document.get("timestamp")
 
@@ -516,159 +496,128 @@ async def get_ohlc(
                 continue
 
             try:
-
                 price = float(price)
 
-                # ----------------------------------
-                # Convert timestamp into datetime
-                # ----------------------------------
-
-                if isinstance(
-                    timestamp,
-                    datetime
-                ):
-
+                if isinstance(timestamp, datetime):
                     dt = timestamp
-
                 else:
-
-                    timestamp_text = str(
-                        timestamp
-                    )
-
-                    # Handle ISO timestamps ending
-                    # with Z
+                    timestamp_text = str(timestamp)
                     if timestamp_text.endswith("Z"):
-                        timestamp_text = (
-                            timestamp_text[:-1]
-                            + "+00:00"
-                        )
-
-                    dt = datetime.fromisoformat(
-                        timestamp_text
-                    )
+                        timestamp_text = timestamp_text[:-1] + "+00:00"
+                    dt = datetime.fromisoformat(timestamp_text)
 
                 records.append({
                     "datetime": dt,
                     "price": price
                 })
-
             except Exception:
-
-                logger.warning(
-                    f"Invalid historical record "
-                    f"ignored for {coin}"
-                )
-
-        # ------------------------------------------
-        # No records
-        # ------------------------------------------
+                pass
 
         if not records:
-
             return {
                 "status": "success",
                 "coin": coin,
-                "interval": "1m",
+                "interval": interval,
+                "count": 0,
+                "summary": {
+                    "bullish_candles": 0,
+                    "bearish_candles": 0,
+                    "period_high": None,
+                    "period_low": None,
+                    "avg_body_size": 0.0,
+                },
                 "data": []
             }
 
         # ------------------------------------------
-        # Build 1-minute candles
+        # Build candles based on requested interval
         # ------------------------------------------
-
         candles = {}
 
         for record in records:
-
             dt = record["datetime"]
             price = record["price"]
 
-            # Remove seconds/microseconds so all
-            # prices in the same minute belong to
-            # one candle.
-            candle_time = dt.replace(
-                second=0,
-                microsecond=0
-            )
+            if interval == "5m":
+                bucket_minute = (dt.minute // 5) * 5
+                candle_time = dt.replace(minute=bucket_minute, second=0, microsecond=0)
+            elif interval == "15m":
+                bucket_minute = (dt.minute // 15) * 15
+                candle_time = dt.replace(minute=bucket_minute, second=0, microsecond=0)
+            elif interval == "1h":
+                candle_time = dt.replace(minute=0, second=0, microsecond=0)
+            else:
+                # 1m default
+                candle_time = dt.replace(second=0, microsecond=0)
 
             key = candle_time.isoformat()
 
             if key not in candles:
-
                 candles[key] = {
-
-                    "timestamp":
-                        int(
-                            candle_time.timestamp()
-                            * 1000
-                        ),
-
+                    "timestamp": int(candle_time.timestamp() * 1000),
                     "open": price,
-
                     "high": price,
-
                     "low": price,
-
                     "close": price
                 }
-
             else:
-
                 candle = candles[key]
-
-                # Open remains the first price.
-
-                candle["high"] = max(
-                    candle["high"],
-                    price
-                )
-
-                candle["low"] = min(
-                    candle["low"],
-                    price
-                )
-
-                # Close becomes the newest price.
+                candle["high"] = max(candle["high"], price)
+                candle["low"] = min(candle["low"], price)
                 candle["close"] = price
 
-        # ------------------------------------------
-        # Convert dictionary to sorted list
-        # ------------------------------------------
-
-        ohlc_data = list(
-            candles.values()
-        )
-
-        ohlc_data.sort(
-            key=lambda x:
-                x["timestamp"]
-        )
-
-        # ------------------------------------------
-        # Return only the latest requested candles
-        # ------------------------------------------
-
+        ohlc_data = list(candles.values())
+        ohlc_data.sort(key=lambda x: x["timestamp"])
         ohlc_data = ohlc_data[-limit:]
 
+        # ------------------------------------------
+        # Calculate Technical Indicators (SMA-5, SMA-10)
+        # & Candle Statistics
+        # ------------------------------------------
+        bullish_count = 0
+        bearish_count = 0
+        body_sizes = []
+
+        for i, c in enumerate(ohlc_data):
+            # Calculate Moving Averages on Close Prices
+            slice5 = [x["close"] for x in ohlc_data[max(0, i - 4): i + 1]]
+            c["sma5"] = round(sum(slice5) / len(slice5), 2)
+
+            slice10 = [x["close"] for x in ohlc_data[max(0, i - 9): i + 1]]
+            c["sma10"] = round(sum(slice10) / len(slice10), 2)
+
+            if c["close"] >= c["open"]:
+                bullish_count += 1
+            else:
+                bearish_count += 1
+
+            body_sizes.append(abs(c["close"] - c["open"]))
+
+        period_high = max((c["high"] for c in ohlc_data), default=None)
+        period_low = min((c["low"] for c in ohlc_data), default=None)
+        avg_body = (
+            round(sum(body_sizes) / len(body_sizes), 2)
+            if body_sizes
+            else 0.0
+        )
+
         logger.info(
-            f"Generated {len(ohlc_data)} "
-            f"1-minute OHLC candles for {coin}"
+            f"Generated {len(ohlc_data)} {interval} OHLC candles for {coin}"
         )
 
         return {
-
             "status": "success",
-
             "coin": coin,
-
-            "interval": "1m",
-
-            "count":
-                len(ohlc_data),
-
-            "data":
-                ohlc_data
+            "interval": interval,
+            "count": len(ohlc_data),
+            "summary": {
+                "bullish_candles": bullish_count,
+                "bearish_candles": bearish_count,
+                "period_high": period_high,
+                "period_low": period_low,
+                "avg_body_size": avg_body,
+            },
+            "data": ohlc_data
         }
 
     except HTTPException:
