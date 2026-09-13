@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { createPriceWebSocket } from "../services/websocket";
+import { createPriceWebSocket, createAlertWebSocket } from "../services/websocket";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -16,6 +16,8 @@ function Dashboard() {
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
  const [wsStatus, setWsStatus] = useState("connecting");
+ const [liveAlerts, setLiveAlerts] = useState([]);
+ const [alertWsStatus, setAlertWsStatus] = useState("connecting");
 
  const [gainersAndLosers, setGainersAndLosers] = useState({
   gainers: [],
@@ -207,6 +209,34 @@ function Dashboard() {
 
     return () => {
       socket.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    const alertSocket = createAlertWebSocket({
+      onOpen: () => {
+        setAlertWsStatus("connected");
+      },
+      onMessage: (data) => {
+        setLiveAlerts((prev) => [
+          {
+            ...data,
+            id: data.alert_id || `${Date.now()}-${Math.random()}`,
+            receivedAt: new Date().toLocaleTimeString(),
+          },
+          ...prev.slice(0, 9),
+        ]);
+      },
+      onClose: () => {
+        setAlertWsStatus("disconnected");
+      },
+      onError: () => {
+        setAlertWsStatus("disconnected");
+      },
+    });
+
+    return () => {
+      alertSocket.close();
     };
   }, []);
 
