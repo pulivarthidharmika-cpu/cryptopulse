@@ -83,7 +83,12 @@ async def alert_websocket(websocket: WebSocket):
 
     try:
         while True:
-            await websocket.receive_text()
+            msg = await websocket.receive_text()
+            if msg in ("ping", '{"type":"ping"}', '{"type": "ping"}'):
+                try:
+                    await websocket.send_text('{"type":"pong"}')
+                except Exception:
+                    break
 
     except WebSocketDisconnect:
         alert_websocket_manager.disconnect(websocket)
