@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime
 
 from kafka import KafkaConsumer
 
@@ -133,13 +134,29 @@ async def store_market_alert(data: dict):
         if not clean_data:
             return
 
-        await alerts_collection.insert_one(
-            clean_data
-        )
+        from bson import ObjectId
+
+        alert_id = clean_data.get("alert_id")
+        now_iso = clean_data.get("triggered_at") or datetime.utcnow().isoformat()
+
+        if alert_id:
+            try:
+                obj_id = ObjectId(alert_id)
+                await alerts_collection.update_one(
+                    {"_id": obj_id},
+                    {"$set": {
+                        "status": "triggered",
+                        "triggered_at": now_iso,
+                        "current_price": clean_data.get("current_price"),
+                        "message": clean_data.get("message")
+                    }}
+                )
+            except Exception:
+                pass
 
         logger.info(
             f"Market alert stored in MongoDB: "
-            f"{clean_data.get('coin', 'unknown')}"
+            f"{clean_data.get('coin', 'unknown')} - {clean_data.get('message', '')}"
         )
 
     except Exception as e:
@@ -189,7 +206,9 @@ def get_consumer():
 
             group_id="cryptopulse-consumer-group",
 
-            request_timeout_ms=3000,
+            session_timeout_ms=10000,
+
+            request_timeout_ms=30000,
 
             consumer_timeout_ms=1000,
 
