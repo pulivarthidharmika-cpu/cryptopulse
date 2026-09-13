@@ -540,11 +540,30 @@ function Dashboard() {
       )}
 
 
-      {/* ================= LOADING ================= */}
+      {/* ================= LOADING SKELETONS ================= */}
 
       {loading && (
-        <div className="message">
-          Loading cryptocurrency prices...
+        <div className="skeleton-grid">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="skeleton-card">
+              <div className="skeleton-header">
+                <div className="skeleton-circle"></div>
+                <div className="skeleton-titles">
+                  <div className="skeleton-line skeleton-title"></div>
+                  <div className="skeleton-line skeleton-subtitle"></div>
+                </div>
+              </div>
+              <div className="skeleton-line skeleton-price-label"></div>
+              <div className="skeleton-line skeleton-price"></div>
+              <div className="skeleton-line skeleton-range-bar"></div>
+              <div className="skeleton-stats-grid">
+                <div className="skeleton-box"></div>
+                <div className="skeleton-box"></div>
+                <div className="skeleton-box"></div>
+                <div className="skeleton-box"></div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1121,6 +1140,13 @@ function Dashboard() {
                 </strong>
               </div>
 
+              <div>
+                <span>Pipeline Feeds</span>
+                <strong style={{ color: "#2563eb" }}>
+                  Binance · Kafka
+                </strong>
+              </div>
+
             </div>
 
           </div>
@@ -1377,6 +1403,107 @@ function Dashboard() {
 .ws-status.disconnected {
   color: #dc2626;
 }
+
+
+          /* ================= SKELETON LOADING ================= */
+
+          .skeleton-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+          }
+
+          .skeleton-card {
+            background: var(--card-bg);
+            border-radius: 14px;
+            padding: 27px;
+            box-shadow: 0 5px 20px var(--card-shadow);
+            border-top: 4px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-height: 280px;
+          }
+
+          .skeleton-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+          }
+
+          .skeleton-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, var(--border-color) 25%, var(--card-secondary, rgba(148, 163, 184, 0.15)) 50%, var(--border-color) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+          }
+
+          .skeleton-titles {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+          }
+
+          .skeleton-line {
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--border-color) 25%, var(--card-secondary, rgba(148, 163, 184, 0.15)) 50%, var(--border-color) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+          }
+
+          .skeleton-title {
+            width: 50%;
+            height: 20px;
+          }
+
+          .skeleton-subtitle {
+            width: 30%;
+            height: 12px;
+          }
+
+          .skeleton-price-label {
+            width: 35%;
+            height: 12px;
+          }
+
+          .skeleton-price {
+            width: 60%;
+            height: 32px;
+          }
+
+          .skeleton-range-bar {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+          }
+
+          .skeleton-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 4px;
+          }
+
+          .skeleton-box {
+            height: 54px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, var(--border-color) 25%, var(--card-secondary, rgba(148, 163, 184, 0.15)) 50%, var(--border-color) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+          }
+
+          @keyframes shimmer {
+            0% {
+              background-position: 200% 0;
+            }
+            100% {
+              background-position: -200% 0;
+            }
+          }
 
 
           /* ================= CARDS ================= */
