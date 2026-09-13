@@ -107,7 +107,10 @@ async def get_latest_prices():
     try:
         prices = []
 
-        cursor = live_prices_collection.find({}, {"_id": 0})
+        cursor = live_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0}
+        )
 
         async for document in cursor:
             prices.append(document)
@@ -133,7 +136,10 @@ async def get_history():
     try:
         history = []
 
-        cursor = historical_prices_collection.find({}, {"_id": 0})
+        cursor = historical_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0}
+        )
 
         async for document in cursor:
             history.append(document)

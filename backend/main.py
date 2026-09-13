@@ -105,6 +105,10 @@ async def startup_event():
                 {"$setOnInsert": {"coin": coin, "active": True}},
                 upsert=True
             )
+        await coins_collection.update_many(
+            {"coin": {"$nin": SUPPORTED_COINS}},
+            {"$set": {"active": False}}
+        )
         logger.info("Default supported coins verified in MongoDB")
     except Exception as e:
         logger.warning(f"Could not seed default coins: {str(e)}")

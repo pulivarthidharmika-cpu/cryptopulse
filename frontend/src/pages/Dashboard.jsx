@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPriceWebSocket } from "../services/websocket";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function Dashboard() {
   const userName =
@@ -16,6 +16,11 @@ function Dashboard() {
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
  const [wsStatus, setWsStatus] = useState("connecting");
+
+ const [gainersAndLosers, setGainersAndLosers] = useState({
+  gainers: [],
+  losers: [],
+});
 
   const fetchPrices = async () => {
     try {
@@ -41,15 +46,43 @@ function Dashboard() {
     }
   };
 
-  useEffect(() => {
+  const fetchGainersAndLosers = async () => {
+  try {
+    const response = await fetch(`${BASE_URL}/analytics/`);
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch market movers");
+    }
+
+    const result = await response.json();
+
+    setGainersAndLosers(
+      result.gainers_and_losers || {
+        gainers: [],
+        losers: [],
+      }
+    );
+  } catch (err) {
+    console.error("Gainers/Losers fetch error:", err);
+  }
+};
+
+  const handleRefresh = () => {
     fetchPrices();
+    fetchGainersAndLosers();
+  };
 
-    const interval = setInterval(() => {
-      fetchPrices();
-    }, 30000);
+ useEffect(() => {
+  fetchPrices();
+  fetchGainersAndLosers();
 
-    return () => clearInterval(interval);
-  }, []);
+  const interval = setInterval(() => {
+    fetchPrices();
+    fetchGainersAndLosers();
+  }, 30000);
+
+  return () => clearInterval(interval);
+}, []);
 
    useEffect(() => {
     const socket = createPriceWebSocket({
@@ -193,7 +226,7 @@ function Dashboard() {
           </div>
 
           <button
-            onClick={fetchPrices}
+            onClick={handleRefresh}
             className="refresh-button"
           >
             ↻ &nbsp; Refresh Data
@@ -424,6 +457,185 @@ function Dashboard() {
             })}
 
           </div>
+
+{/* ================= TOP GAINERS / TOP LOSERS ================= */}
+
+<div className="market-movers">
+
+  {/* TOP GAINERS */}
+
+  <div className="movers-column">
+
+    <div className="movers-header">
+
+      <div>
+        <h2 className="movers-title">
+          Top Gainers
+        </h2>
+
+        <p className="movers-subtitle">
+          Assets with the strongest recent price growth
+        </p>
+      </div>
+
+      <span className="movers-indicator gain">
+        ↑ GAINERS
+      </span>
+
+    </div>
+
+
+    <div className="movers-list">
+
+      {gainersAndLosers?.gainers && gainersAndLosers.gainers.length > 0 ? (
+
+        gainersAndLosers.gainers.map((item, index) => (
+
+          <div
+            key={`gainer-${item.coin}`}
+            className="mover-item"
+          >
+
+            <div className="mover-rank">
+              #{index + 1}
+            </div>
+
+
+            <div
+              className="mover-icon"
+              style={{
+                backgroundColor:
+                  `${getCoinColor(item.coin)}20`,
+                color:
+                  getCoinColor(item.coin),
+              }}
+            >
+              {getCoinSymbol(item.coin)}
+            </div>
+
+
+            <div className="mover-info">
+
+              <strong>
+                {item.coin.charAt(0).toUpperCase() +
+                  item.coin.slice(1)}
+              </strong>
+
+              <span>
+                ${formatPrice(item.price)}
+              </span>
+
+            </div>
+
+
+            <div className={`mover-change ${item.change_percentage >= 0 ? "gain-text" : "loss-text"}`}>
+              {item.change_percentage > 0 ? `+${item.change_percentage}` : item.change_percentage}%
+            </div>
+
+          </div>
+
+        ))
+
+      ) : (
+
+        <div className="movers-empty">
+          No gainers data available.
+        </div>
+
+      )}
+
+    </div>
+
+  </div>
+
+
+  {/* TOP LOSERS */}
+
+  <div className="movers-column">
+
+    <div className="movers-header">
+
+      <div>
+        <h2 className="movers-title">
+          Top Losers
+        </h2>
+
+        <p className="movers-subtitle">
+          Assets with the weakest recent price movement
+        </p>
+      </div>
+
+      <span className="movers-indicator loss">
+        ↓ LOSERS
+      </span>
+
+    </div>
+
+
+    <div className="movers-list">
+
+      {gainersAndLosers?.losers && gainersAndLosers.losers.length > 0 ? (
+
+        gainersAndLosers.losers.map((item, index) => (
+
+          <div
+            key={`loser-${item.coin}`}
+            className="mover-item"
+          >
+
+            <div className="mover-rank">
+              #{index + 1}
+            </div>
+
+
+            <div
+              className="mover-icon"
+              style={{
+                backgroundColor:
+                  `${getCoinColor(item.coin)}20`,
+                color:
+                  getCoinColor(item.coin),
+              }}
+            >
+              {getCoinSymbol(item.coin)}
+            </div>
+
+
+            <div className="mover-info">
+
+              <strong>
+                {item.coin.charAt(0).toUpperCase() +
+                  item.coin.slice(1)}
+              </strong>
+
+              <span>
+                ${formatPrice(item.price)}
+              </span>
+
+            </div>
+
+
+            <div className={`mover-change ${item.change_percentage <= 0 ? "loss-text" : "gain-text"}`}>
+              {item.change_percentage > 0 ? `+${item.change_percentage}` : item.change_percentage}%
+            </div>
+
+          </div>
+
+        ))
+
+      ) : (
+
+        <div className="movers-empty">
+          No losers data available.
+        </div>
+
+      )}
+
+    </div>
+
+  </div>
+
+</div>
 
 
           {/* ================= MARKET SUMMARY ================= */}
@@ -1038,6 +1250,156 @@ function Dashboard() {
               --error-text: #b91c1c;
             }
 
+          }
+
+
+          /* ================= MARKET MOVERS ================= */
+
+          .market-movers {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 22px;
+            margin-bottom: 35px;
+          }
+
+          .movers-column {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 6px 20px var(--card-shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+          }
+
+          .movers-column:hover {
+            transform: translateY(-2px);
+          }
+
+          .movers-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+          }
+
+          .movers-title {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.3px;
+          }
+
+          .movers-subtitle {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+          }
+
+          .movers-indicator {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+          }
+
+          .movers-indicator.gain {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+          }
+
+          .movers-indicator.loss {
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+          }
+
+          .movers-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+
+          .mover-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--stat-bg);
+            border: 1px solid var(--border-color);
+            transition: background 0.15s ease;
+          }
+
+          .mover-item:hover {
+            filter: brightness(0.97);
+          }
+
+          .mover-rank {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 24px;
+            flex-shrink: 0;
+          }
+
+          .mover-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 16px;
+            flex-shrink: 0;
+          }
+
+          .mover-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+            min-width: 0;
+          }
+
+          .mover-info strong {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+          }
+
+          .mover-info span {
+            font-size: 13px;
+            color: var(--text-secondary);
+          }
+
+          .mover-change {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            flex-shrink: 0;
+          }
+
+          .gain-text {
+            color: #16a34a;
+          }
+
+          .loss-text {
+            color: #dc2626;
+          }
+
+          .movers-empty {
+            padding: 28px 16px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+            background: var(--stat-bg);
+            border-radius: 12px;
+            border: 1px dashed var(--border-color);
           }
 
 

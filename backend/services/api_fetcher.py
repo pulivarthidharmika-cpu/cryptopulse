@@ -53,7 +53,7 @@ CRYPTOCOMPARE_SYMBOLS = {
 async def get_active_coins():
 
     coins = await coins_collection.find(
-        {"active": True},
+        {"active": True, "coin": {"$in": SUPPORTED_COINS}},
         {"_id": 0, "coin": 1}
     ).to_list(length=100)
 
