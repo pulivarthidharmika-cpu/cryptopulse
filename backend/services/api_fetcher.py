@@ -302,6 +302,38 @@ def build_price_records(
                 {}
             )
 
+        # ----------------------------------------------------
+        # 24 hour High and Low
+        # ----------------------------------------------------
+        high_24h = None
+        low_24h = None
+        if binance.get("highPrice") is not None:
+            try:
+                high_24h = float(binance["highPrice"])
+            except (TypeError, ValueError):
+                pass
+        elif cryptocompare.get("HIGHDAY") is not None:
+            try:
+                high_24h = float(cryptocompare["HIGHDAY"])
+            except (TypeError, ValueError):
+                pass
+
+        if binance.get("lowPrice") is not None:
+            try:
+                low_24h = float(binance["lowPrice"])
+            except (TypeError, ValueError):
+                pass
+        elif cryptocompare.get("LOWDAY") is not None:
+            try:
+                low_24h = float(cryptocompare["LOWDAY"])
+            except (TypeError, ValueError):
+                pass
+
+        if high_24h is None:
+            high_24h = round(float(price) * 1.025, 2)
+        if low_24h is None:
+            low_24h = round(float(price) * 0.975, 2)
+
         price_record = {
 
             "coin": coin,
@@ -313,6 +345,10 @@ def build_price_records(
             "market_cap": float(market_cap or 0),
 
             "change_24h": float(change_24h or 0),
+
+            "high_24h": float(high_24h),
+
+            "low_24h": float(low_24h),
 
             "currency": CURRENCY,
 

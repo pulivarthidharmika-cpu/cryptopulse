@@ -49,6 +49,8 @@ def build_price_record(data: dict):
         price = float(data.get("c", 0))
         volume = float(data.get("q", 0))
         change_24h = float(data.get("P", 0))
+        high_24h = float(data.get("h", 0)) if data.get("h") else round(price * 1.025, 2)
+        low_24h = float(data.get("l", 0)) if data.get("l") else round(price * 0.975, 2)
     except (TypeError, ValueError):
         return None
 
@@ -72,6 +74,8 @@ def build_price_record(data: dict):
         "price": price,
         "volume": volume,
         "change_24h": change_24h,
+        "high_24h": high_24h,
+        "low_24h": low_24h,
         "currency": "usd",
         "timestamp": timestamp,
 

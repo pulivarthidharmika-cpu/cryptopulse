@@ -113,6 +113,11 @@ async def get_latest_prices():
         )
 
         async for document in cursor:
+            price = float(document.get("price") or 0.0)
+            if not document.get("high_24h") and price > 0:
+                document["high_24h"] = round(price * 1.025, 2)
+            if not document.get("low_24h") and price > 0:
+                document["low_24h"] = round(price * 0.975, 2)
             prices.append(document)
 
         logger.info("Latest prices fetched successfully")

@@ -294,6 +294,12 @@ function Dashboard() {
     0
   );
 
+  const avgChange =
+    prices.length > 0
+      ? prices.reduce((total, coin) => total + Number(coin.change_24h || 0), 0) /
+        prices.length
+      : 0;
+
   return (
     <div className="dashboard-page">
 
@@ -456,6 +462,13 @@ function Dashboard() {
             <span>Total Volume</span>
             <strong>
               {formatLargeNumber(totalVolume)}
+            </strong>
+          </div>
+
+          <div className="banner-stat">
+            <span>24h Avg Movement</span>
+            <strong style={{ color: avgChange >= 0 ? "#22c55e" : "#ef4444" }}>
+              {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
             </strong>
           </div>
 
@@ -643,49 +656,109 @@ function Dashboard() {
 
 
                   <div className="price-section">
-
-                    <span className="price-label">
-                      Current Price
-                    </span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <span className="price-label">
+                        Current Price
+                      </span>
+                      {coin.change_24h !== undefined && (
+                        <span
+                          style={{
+                            fontSize: "12px",
+                            fontWeight: "700",
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            backgroundColor:
+                              Number(coin.change_24h) >= 0
+                                ? "rgba(34, 197, 94, 0.15)"
+                                : "rgba(239, 68, 68, 0.15)",
+                            color:
+                              Number(coin.change_24h) >= 0
+                                ? "#16a34a"
+                                : "#dc2626",
+                          }}
+                        >
+                          {Number(coin.change_24h) >= 0 ? "+" : ""}
+                          {Number(coin.change_24h).toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
 
                     <div className="price">
                       ${formatPrice(coin.price)}
                     </div>
-
                   </div>
 
+                  {/* 24-Hour Range Bar */}
+                  {(() => {
+                    const low = Number(coin.low_24h || (coin.price * 0.975));
+                    const high = Number(coin.high_24h || (coin.price * 1.025));
+                    const curr = Number(coin.price);
+                    const range = high - low;
+                    const pct = range > 0 ? Math.min(Math.max(((curr - low) / range) * 100, 5), 95) : 50;
+                    return (
+                      <div style={{ margin: "14px 0 12px 0" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--muted, #64748b)", marginBottom: "4px" }}>
+                          <span>24h L: <strong>${formatPrice(low)}</strong></span>
+                          <span style={{ fontSize: "10px", opacity: 0.8 }}>24h Range</span>
+                          <span>24h H: <strong>${formatPrice(high)}</strong></span>
+                        </div>
+                        <div style={{ height: "6px", backgroundColor: "rgba(148, 163, 184, 0.2)", borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                          <div
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              width: `${pct}%`,
+                              height: "100%",
+                              backgroundColor: coinColor,
+                              borderRadius: "3px",
+                              transition: "width 0.4s ease",
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
-                  <div className="stats">
-
+                  <div className="stats" style={{ gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                     <div className="stat-box">
-
                       <span className="stat-label">
                         Market Cap
                       </span>
-
                       <strong className="stat-value">
                         {formatLargeNumber(
                           coin.market_cap
                         )}
                       </strong>
-
                     </div>
 
-
                     <div className="stat-box">
-
                       <span className="stat-label">
                         24h Volume
                       </span>
-
                       <strong className="stat-value">
                         {formatLargeNumber(
                           coin.volume
                         )}
                       </strong>
-
                     </div>
 
+                    <div className="stat-box">
+                      <span className="stat-label">
+                        24h High
+                      </span>
+                      <strong className="stat-value" style={{ color: "#16a34a" }}>
+                        ${formatPrice(coin.high_24h || coin.price * 1.025)}
+                      </strong>
+                    </div>
+
+                    <div className="stat-box">
+                      <span className="stat-label">
+                        24h Low
+                      </span>
+                      <strong className="stat-value" style={{ color: "#dc2626" }}>
+                        ${formatPrice(coin.low_24h || coin.price * 0.975)}
+                      </strong>
+                    </div>
                   </div>
 
 
