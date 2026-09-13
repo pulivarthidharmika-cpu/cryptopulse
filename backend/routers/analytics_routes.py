@@ -790,3 +790,123 @@ async def get_heatmap():
     except Exception as e:
         logger.error(f"Heatmap generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================================================
+# MARKET INTELLIGENCE DATA
+# GET /analytics/intelligence
+#
+# Generates BTC/ETH dominance, sentiment score,
+# volume momentum, and volatility regime.
+# ==================================================
+
+@router.get("/intelligence")
+async def get_market_intelligence():
+    try:
+        cursor = live_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0}
+        )
+
+        live_data = {}
+        async for doc in cursor:
+            live_data[doc.get("coin")] = doc
+
+        total_market_cap = 0.0
+        btc_market_cap = 0.0
+        eth_market_cap = 0.0
+        total_volume = 0.0
+        changes = []
+
+        for coin in SUPPORTED_COINS:
+            doc = live_data.get(coin, {})
+            mcap = float(doc.get("market_cap") or 0.0)
+            vol = float(doc.get("volume") or 0.0)
+            chg = float(doc.get("change_24h") or 0.0)
+
+            total_market_cap += mcap
+            total_volume += vol
+            changes.append(chg)
+
+            if coin == "bitcoin":
+                btc_market_cap = mcap
+            elif coin == "ethereum":
+                eth_market_cap = mcap
+
+        btc_dominance = (
+            round((btc_market_cap / total_market_cap) * 100, 2)
+            if total_market_cap > 0
+            else 0.0
+        )
+        eth_dominance = (
+            round((eth_market_cap / total_market_cap) * 100, 2)
+            if total_market_cap > 0
+            else 0.0
+        )
+        alt_dominance = max(
+            round(100.0 - btc_dominance - eth_dominance, 2), 0.0
+        )
+
+        avg_change = sum(changes) / len(changes) if changes else 0.0
+
+        # Calculate dynamic Sentiment Index (0 - 100)
+        base_score = 50 + (avg_change * 5.0)
+        sentiment_score = int(min(max(round(base_score), 5), 95))
+
+        if sentiment_score >= 75:
+            sentiment_label = "Extreme Greed"
+            sentiment_color = "#15803d"
+        elif sentiment_score >= 58:
+            sentiment_label = "Greed"
+            sentiment_color = "#22c55e"
+        elif sentiment_score >= 45:
+            sentiment_label = "Neutral"
+            sentiment_color = "#f59e0b"
+        elif sentiment_score >= 25:
+            sentiment_label = "Fear"
+            sentiment_color = "#f97316"
+        else:
+            sentiment_label = "Extreme Fear"
+            sentiment_color = "#dc2626"
+
+        # Market breadth (gainers vs losers)
+        advancing = sum(1 for c in changes if c > 0)
+        declining = sum(1 for c in changes if c < 0)
+
+        # Volatility assessment
+        stdev = statistics.stdev(changes) if len(changes) > 1 else 0.0
+        if stdev > 3.0:
+            volatility_regime = "High Volatility"
+        elif stdev > 1.0:
+            volatility_regime = "Moderate Volatility"
+        else:
+            volatility_regime = "Low Volatility"
+
+        logger.info("Market intelligence metrics calculated successfully")
+
+        return {
+            "status": "success",
+            "dominance": {
+                "bitcoin": btc_dominance,
+                "ethereum": eth_dominance,
+                "altcoins": alt_dominance
+            },
+            "sentiment": {
+                "score": sentiment_score,
+                "label": sentiment_label,
+                "color": sentiment_color
+            },
+            "market_breadth": {
+                "advancing": advancing,
+                "declining": declining,
+                "neutral": len(changes) - advancing - declining
+            },
+            "volatility_regime": volatility_regime,
+            "average_24h_change": round(avg_change, 2),
+            "total_market_cap": round(total_market_cap, 2),
+            "total_volume": round(total_volume, 2)
+        }
+
+    except Exception as e:
+        logger.error(f"Market intelligence calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

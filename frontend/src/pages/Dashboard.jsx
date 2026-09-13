@@ -24,6 +24,7 @@ function Dashboard() {
 
  const [heatmapData, setHeatmapData] = useState(null);
  const [heatmapLoading, setHeatmapLoading] = useState(true);
+ const [marketIntelligence, setMarketIntelligence] = useState(null);
 
   const fetchPrices = async () => {
     try {
@@ -88,21 +89,35 @@ function Dashboard() {
     }
   };
 
+  const fetchMarketIntelligence = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/analytics/intelligence`);
+      if (!response.ok) return;
+      const result = await response.json();
+      setMarketIntelligence(result);
+    } catch (err) {
+      console.error("Intelligence fetch error:", err);
+    }
+  };
+
   const handleRefresh = () => {
     fetchPrices();
     fetchGainersAndLosers();
     fetchHeatmap();
+    fetchMarketIntelligence();
   };
 
  useEffect(() => {
   fetchPrices();
   fetchGainersAndLosers();
   fetchHeatmap();
+  fetchMarketIntelligence();
 
   const interval = setInterval(() => {
     fetchPrices();
     fetchGainersAndLosers();
     fetchHeatmap();
+    fetchMarketIntelligence();
   }, 30000);
 
   return () => clearInterval(interval);
@@ -354,6 +369,69 @@ function Dashboard() {
         </div>
 
       </div>
+
+
+      {/* ================= MARKET INTELLIGENCE BAR ================= */}
+      {marketIntelligence && (
+        <div className="intelligence-banner">
+          <div className="intelligence-item">
+            <span className="intel-label">Market Sentiment</span>
+            <div className="intel-val-row">
+              <span
+                className="sentiment-pill"
+                style={{
+                  backgroundColor: `${marketIntelligence.sentiment.color}20`,
+                  color: marketIntelligence.sentiment.color,
+                  border: `1px solid ${marketIntelligence.sentiment.color}40`,
+                }}
+              >
+                {marketIntelligence.sentiment.label} ({marketIntelligence.sentiment.score}/100)
+              </span>
+            </div>
+          </div>
+
+          <div className="intelligence-item">
+            <span className="intel-label">Asset Dominance</span>
+            <div className="dominance-bar-container">
+              <div className="dominance-labels">
+                <span>BTC: <strong>{marketIntelligence.dominance.bitcoin}%</strong></span>
+                <span>ETH: <strong>{marketIntelligence.dominance.ethereum}%</strong></span>
+                <span>SOL: <strong>{marketIntelligence.dominance.altcoins}%</strong></span>
+              </div>
+              <div className="dominance-progress-track">
+                <div
+                  className="dominance-segment btc"
+                  style={{ width: `${marketIntelligence.dominance.bitcoin}%` }}
+                ></div>
+                <div
+                  className="dominance-segment eth"
+                  style={{ width: `${marketIntelligence.dominance.ethereum}%` }}
+                ></div>
+                <div
+                  className="dominance-segment sol"
+                  style={{ width: `${marketIntelligence.dominance.altcoins}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="intelligence-item">
+            <span className="intel-label">Market Breadth</span>
+            <div className="breadth-chips">
+              <span className="breadth-chip gain">↑ {marketIntelligence.market_breadth.advancing} Up</span>
+              <span className="breadth-chip loss">↓ {marketIntelligence.market_breadth.declining} Down</span>
+            </div>
+          </div>
+
+          <div className="intelligence-item">
+            <span className="intel-label">Market Regime</span>
+            <div className="regime-badge">
+              <span className="regime-dot"></span>
+              <strong>{marketIntelligence.volatility_regime}</strong>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* ================= LOADING ================= */}
@@ -1773,6 +1851,126 @@ function Dashboard() {
             background: var(--stat-bg);
             border-radius: 14px;
             border: 1px dashed var(--border-color);
+          }
+
+
+          /* ================= MARKET INTELLIGENCE ================= */
+
+          .intelligence-banner {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 16px 22px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 16px var(--card-shadow);
+          }
+
+          .intelligence-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .intel-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+
+          .intel-val-row {
+            display: flex;
+            align-items: center;
+          }
+
+          .sentiment-pill {
+            padding: 4px 12px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 700;
+          }
+
+          .dominance-bar-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .dominance-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+          }
+
+          .dominance-labels strong {
+            color: var(--text-primary);
+          }
+
+          .dominance-progress-track {
+            height: 8px;
+            background: var(--stat-bg);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            border: 1px solid var(--border-color);
+          }
+
+          .dominance-segment.btc {
+            background: #f59e0b;
+          }
+
+          .dominance-segment.eth {
+            background: #6366f1;
+          }
+
+          .dominance-segment.sol {
+            background: #14b8a6;
+          }
+
+          .breadth-chips {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .breadth-chip {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .breadth-chip.gain {
+            background: rgba(34, 197, 94, 0.15);
+            color: #16a34a;
+          }
+
+          .breadth-chip.loss {
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+          }
+
+          .regime-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+          }
+
+          .regime-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3b82f6;
+          }
+
+          .regime-badge strong {
+            color: var(--text-primary);
           }
 
 
