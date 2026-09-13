@@ -6,6 +6,7 @@ from database.database import (
     live_prices_collection
 )
 
+from kafka_service.producer import publish_market_alert
 from utils.logger import logger
 
 
@@ -115,6 +116,8 @@ async def check_alerts():
 
                 if triggered:
 
+                    now = datetime.utcnow()
+
                     await alerts_collection.update_one(
 
                         {
@@ -125,7 +128,7 @@ async def check_alerts():
                         {
                             "$set": {
                                 "status": "triggered",
-                                "triggered_at": datetime.utcnow(),
+                                "triggered_at": now,
                                 "current_price": current_price
                             }
                         }
@@ -140,6 +143,36 @@ async def check_alerts():
                         f"Alert triggered for {coin} "
                         f"at {current_price}"
                     )
+
+                    # ----------------------------------
+                    # Publish triggered alert to Kafka
+                    # Topic: market-alerts
+                    # ----------------------------------
+
+                    alert_payload = {
+                        "alert_id": str(alert["_id"]),
+                        "coin": coin,
+                        "user_id": alert.get("user_id", "system"),
+                        "condition": condition,
+                        "target_price": target_price,
+                        "current_price": current_price,
+                        "status": "triggered",
+                        "triggered_at": now.isoformat(),
+                        "message": (
+                            f"Price Alert: {coin.upper()} is now ${current_price:,.2f} "
+                            f"({condition} target ${target_price:,.2f})"
+                        )
+                    }
+
+                    try:
+                        publish_market_alert(alert_payload)
+                        logger.info(
+                            f"Published triggered alert for {coin} to Kafka topic 'market-alerts'"
+                        )
+                    except Exception as pe:
+                        logger.warning(
+                            f"Failed to publish alert for {coin} to Kafka: {str(pe)}"
+                        )
 
             # ------------------------------------------
             # Check again after 10 seconds
