@@ -910,3 +910,102 @@ async def get_market_intelligence():
     except Exception as e:
         logger.error(f"Market intelligence calculation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================================================
+# TRADING VOLUME ANALYTICS
+# GET /analytics/volume
+#
+# Generates cross-asset volume distribution,
+# volume-to-market-cap ratio, and volume spike detection.
+# ==================================================
+
+@router.get("/volume")
+async def get_volume_analytics():
+    try:
+        cursor = live_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0}
+        )
+
+        live_data = {}
+        async for doc in cursor:
+            live_data[doc.get("coin")] = doc
+
+        hist_cursor = historical_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0, "coin": 1, "volume": 1, "timestamp": 1}
+        ).sort("timestamp", -1).limit(150)
+
+        hist_records = []
+        async for doc in hist_cursor:
+            hist_records.append(doc)
+
+        coin_volumes = {}
+        total_volume = 0.0
+
+        for coin in SUPPORTED_COINS:
+            live_doc = live_data.get(coin, {})
+            vol = float(live_doc.get("volume") or 0.0)
+            mcap = float(live_doc.get("market_cap") or 0.0)
+
+            total_volume += vol
+
+            recent_vols = [
+                float(h["volume"])
+                for h in hist_records
+                if h.get("coin") == coin and h.get("volume") is not None
+            ]
+
+            avg_vol = (
+                round(sum(recent_vols) / len(recent_vols), 2)
+                if recent_vols
+                else vol
+            )
+
+            vol_ratio = (
+                round((vol / mcap) * 100, 3)
+                if mcap > 0
+                else 0.0
+            )
+
+            is_spike = vol >= (avg_vol * 1.5) if avg_vol > 0 else False
+
+            coin_volumes[coin] = {
+                "coin": coin,
+                "latest_volume": vol,
+                "average_volume": avg_vol,
+                "volume_to_market_cap_pct": vol_ratio,
+                "volume_spike": is_spike,
+                "liquidity_rating": (
+                    "High Liquidity" if vol_ratio > 1.0 else
+                    ("Moderate Liquidity" if vol_ratio > 0.3 else "Low Liquidity")
+                )
+            }
+
+        volume_breakdown = []
+        for coin, details in coin_volumes.items():
+            share = (
+                round((details["latest_volume"] / total_volume) * 100, 2)
+                if total_volume > 0
+                else 33.33
+            )
+            details["volume_share"] = share
+            volume_breakdown.append(details)
+
+        volume_breakdown.sort(key=lambda x: x["latest_volume"], reverse=True)
+
+        volume_leader = volume_breakdown[0]["coin"] if volume_breakdown else None
+
+        logger.info("Volume analytics calculated successfully")
+
+        return {
+            "status": "success",
+            "total_volume": round(total_volume, 2),
+            "volume_leader": volume_leader,
+            "coins": volume_breakdown
+        }
+
+    except Exception as e:
+        logger.error(f"Volume analytics calculation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
