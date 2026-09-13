@@ -1,5 +1,5 @@
 # Import required FastAPI classes
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
 
 # Import datetime to store timestamps
 from datetime import datetime
@@ -28,6 +28,71 @@ router = APIRouter(
     prefix="/alerts",
     tags=["Alerts"]
 )
+
+
+# ============================================================
+# REAL-TIME ALERT WEBSOCKET CONNECTION MANAGER
+# ============================================================
+
+class AlertWebSocketManager:
+
+    def __init__(self):
+        self.connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.append(websocket)
+        logger.info(
+            f"Alert WebSocket connected. "
+            f"Active connections: {len(self.connections)}"
+        )
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.connections:
+            self.connections.remove(websocket)
+        logger.info(
+            f"Alert WebSocket disconnected. "
+            f"Active connections: {len(self.connections)}"
+        )
+
+    async def broadcast(self, data: dict):
+        disconnected = []
+        for websocket in self.connections:
+            try:
+                await websocket.send_json(data)
+            except Exception as e:
+                logger.warning(
+                    f"Alert WebSocket broadcast failed: {str(e)}"
+                )
+                disconnected.append(websocket)
+
+        for websocket in disconnected:
+            self.disconnect(websocket)
+
+
+alert_websocket_manager = AlertWebSocketManager()
+
+
+# ============================================================
+# ALERT WEBSOCKET ENDPOINT
+# ============================================================
+
+@router.websocket("/ws")
+async def alert_websocket(websocket: WebSocket):
+    await alert_websocket_manager.connect(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+        alert_websocket_manager.disconnect(websocket)
+
+    except Exception as e:
+        logger.warning(
+            f"Alert WebSocket error: {str(e)}"
+        )
+        alert_websocket_manager.disconnect(websocket)
 
 
 # --------------------------------------------------

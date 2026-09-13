@@ -20,6 +20,7 @@ from config.settings import (
 
 from utils.logger import logger
 from routers.price_routes import price_websocket_manager
+from routers.alert_routes import alert_websocket_manager
 
 
 # ==================================================
@@ -287,6 +288,7 @@ async def process_message(
     elif topic == MARKET_ALERTS_TOPIC:
 
         await store_market_alert(data)
+        await alert_websocket_manager.broadcast(data)
 
     else:
 
