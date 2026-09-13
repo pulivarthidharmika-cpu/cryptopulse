@@ -12,7 +12,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from database.database import coins_collection, users_collection
-from config.settings import SUPPORTED_COINS, ADMIN_EMAIL, ADMIN_PASSWORD
+from config.settings import (
+    SUPPORTED_COINS,
+    ADMIN_EMAIL,
+    ADMIN_PASSWORD,
+    validate_configuration,
+)
 from services.auth_service import hash_password
 
 from routers.price_routes import router as price_router
@@ -95,6 +100,20 @@ async def price_fetcher_loop():
 async def startup_event():
 
     logger.info("CryptoPulse API Started")
+
+    # ----------------------------------------------
+    # Validate System Configuration
+    # ----------------------------------------------
+    cfg_report = validate_configuration()
+    if cfg_report["valid"]:
+        logger.info(
+            f"Configuration verified: {len(cfg_report['supported_coins'])} coins, "
+            f"{len(cfg_report['kafka_topics'])} Kafka topics configured"
+        )
+    else:
+        logger.warning(
+            f"Configuration warnings detected: {cfg_report['issues']}"
+        )
 
     # ----------------------------------------------
     # Seed Supported Coins in MongoDB

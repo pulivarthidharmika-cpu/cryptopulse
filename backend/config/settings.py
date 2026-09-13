@@ -230,3 +230,48 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(
         "30"
     )
 )
+
+
+# ==================================================
+# CONFIGURATION VALIDATION
+# ==================================================
+
+def validate_configuration() -> dict:
+    """
+    Validate presence and format of required system environment variables.
+    Returns status dictionary and list of any issues.
+    """
+    issues = []
+
+    if not MONGO_URI.startswith(("mongodb://", "mongodb+srv://")):
+        issues.append(f"Invalid MONGO_URI scheme: {MONGO_URI}")
+
+    if not KAFKA_BOOTSTRAP_SERVERS:
+        issues.append("KAFKA_BOOTSTRAP_SERVERS is empty")
+
+    required_topics = [KAFKA_TOPIC, BTC_PRICE_TOPIC, MARKET_ALERTS_TOPIC, TRADE_VOLUME_TOPIC]
+    if len(set(required_topics)) < 4:
+        issues.append(f"Required Kafka topics must be distinct: {required_topics}")
+
+    for coin in ("bitcoin", "ethereum", "solana"):
+        if coin not in SUPPORTED_COINS:
+            issues.append(f"Core coin '{coin}' missing from SUPPORTED_COINS: {SUPPORTED_COINS}")
+
+    if not SECRET_KEY or len(SECRET_KEY) < 8:
+        issues.append("SECRET_KEY is insecure or unset (must be >= 8 chars)")
+
+    if not BINANCE_WS_URL.startswith(("wss://", "ws://")):
+        issues.append(f"Invalid BINANCE_WS_URL: {BINANCE_WS_URL}")
+
+    return {
+        "valid": len(issues) == 0,
+        "issues": issues,
+        "supported_coins": SUPPORTED_COINS,
+        "kafka_topics": {
+            "prices": KAFKA_TOPIC,
+            "btc_price": BTC_PRICE_TOPIC,
+            "alerts": MARKET_ALERTS_TOPIC,
+            "volume": TRADE_VOLUME_TOPIC,
+        },
+        "database": DATABASE_NAME,
+    }
