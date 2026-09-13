@@ -34,6 +34,25 @@ function Settings() {
         "false"
     );
 
+  const [theme, setTheme] = useState(
+    localStorage.getItem("theme") || "light"
+  );
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setTheme(localStorage.getItem("theme") || "light");
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.setAttribute("data-theme", newTheme);
+    window.dispatchEvent(new Event("storage"));
+  };
+
   // --------------------------------------------------
   // Load saved profile
   // --------------------------------------------------
@@ -354,6 +373,71 @@ function Settings() {
             <span></span>
 
           </button>
+
+        </div>
+
+      </section>
+
+
+      {/* ==================================================
+          APPEARANCE & THEME
+      ================================================== */}
+
+      <section className="settings-section">
+
+        <div className="section-heading">
+
+          <div className="section-icon">
+            🎨
+          </div>
+
+          <div>
+            <h2>Appearance & Theme</h2>
+
+            <p>
+              Customize the visual appearance of CryptoPulse.
+            </p>
+          </div>
+
+        </div>
+
+        <div className="theme-options-grid">
+
+          <div
+            className={`theme-card ${theme === "light" ? "active" : ""}`}
+            onClick={() => handleThemeChange("light")}
+          >
+            <div className="theme-card-icon">☀️</div>
+            <div className="theme-info">
+              <strong>Light Theme</strong>
+              <p>Crisp daylight interface with clean contrast</p>
+            </div>
+            {theme === "light" && <span className="theme-active-badge">✓ Active</span>}
+          </div>
+
+          <div
+            className={`theme-card ${theme === "dark" ? "active" : ""}`}
+            onClick={() => handleThemeChange("dark")}
+          >
+            <div className="theme-card-icon">🌙</div>
+            <div className="theme-info">
+              <strong>Dark Theme</strong>
+              <p>High-contrast deep slate for low-light monitoring</p>
+            </div>
+            {theme === "dark" && <span className="theme-active-badge">✓ Active</span>}
+          </div>
+
+          <div
+            className={`theme-card ${theme === "system" ? "active" : ""}`}
+            onClick={() => handleThemeChange("system")}
+          >
+            <div className="theme-card-icon">💻</div>
+            <div className="theme-info">
+              <strong>System Default</strong>
+              <p>Automatically syncs with your operating system</p>
+            </div>
+            {theme === "system" && <span className="theme-active-badge">✓ Active</span>}
+          </div>
 
         </div>
 
@@ -987,6 +1071,77 @@ function Settings() {
           }
 
 
+          /* ================= THEME OPTIONS ================= */
+
+          .theme-options-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+            margin-top: 15px;
+          }
+
+          .theme-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+          }
+
+          .theme-card:hover {
+            border-color: #93c5fd;
+            transform: translateY(-2px);
+          }
+
+          .theme-card.active {
+            border-color: #2563eb;
+            background: rgba(37, 99, 235, 0.04);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.12);
+          }
+
+          .theme-card-icon {
+            font-size: 26px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f1f5f9;
+            border-radius: 10px;
+          }
+
+          .theme-info {
+            flex: 1;
+          }
+
+          .theme-info strong {
+            display: block;
+            color: #172554;
+            font-size: 14px;
+            font-weight: 700;
+          }
+
+          .theme-info p {
+            margin: 4px 0 0;
+            font-size: 11px;
+            color: #64748b;
+          }
+
+          .theme-active-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: #2563eb;
+            background: #dbeafe;
+            padding: 3px 8px;
+            border-radius: 6px;
+          }
+
+
           /* ================= MOBILE ================= */
 
           @media (max-width: 700px) {
@@ -1014,6 +1169,131 @@ function Settings() {
               flex: 1;
             }
 
+          }
+
+
+          /* ================= DARK THEME OVERRIDES ================= */
+
+          [data-theme="dark"] .settings-heading h1,
+          [data-theme="dark"] .section-heading h2,
+          [data-theme="dark"] .profile-card h3,
+          [data-theme="dark"] .security-item strong,
+          [data-theme="dark"] .preference-item strong,
+          [data-theme="dark"] .info-item label,
+          [data-theme="dark"] .theme-info strong {
+            color: #f8fafc;
+          }
+
+          [data-theme="dark"] .settings-section {
+            background: #0f172a;
+            border-color: #334155;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+          }
+
+          [data-theme="dark"] .settings-heading p,
+          [data-theme="dark"] .section-heading p,
+          [data-theme="dark"] .profile-card p,
+          [data-theme="dark"] .security-item p,
+          [data-theme="dark"] .preference-item p,
+          [data-theme="dark"] .theme-info p {
+            color: #94a3b8;
+          }
+
+          [data-theme="dark"] .theme-card {
+            background: #1e293b;
+            border-color: #334155;
+          }
+
+          [data-theme="dark"] .theme-card:hover {
+            border-color: #60a5fa;
+          }
+
+          [data-theme="dark"] .theme-card.active {
+            background: rgba(37, 99, 235, 0.18);
+            border-color: #3b82f6;
+          }
+
+          [data-theme="dark"] .theme-card-icon {
+            background: #0f172a;
+          }
+
+          [data-theme="dark"] .profile-card,
+          [data-theme="dark"] .security-item,
+          [data-theme="dark"] .preference-item,
+          [data-theme="dark"] .quick-action-btn {
+            background: #1e293b;
+            border-color: #334155;
+            color: #f8fafc;
+          }
+
+          [data-theme="dark"] .info-item span {
+            color: #e2e8f0;
+          }
+
+          [data-theme="dark"] .edit-field input {
+            background: #0f172a;
+            border-color: #334155;
+            color: #f8fafc;
+          }
+
+          @media (prefers-color-scheme: dark) {
+            [data-theme="system"] .settings-heading h1,
+            [data-theme="system"] .section-heading h2,
+            [data-theme="system"] .profile-card h3,
+            [data-theme="system"] .security-item strong,
+            [data-theme="system"] .preference-item strong,
+            [data-theme="system"] .info-item label,
+            [data-theme="system"] .theme-info strong {
+              color: #f8fafc;
+            }
+
+            [data-theme="system"] .settings-section {
+              background: #0f172a;
+              border-color: #334155;
+              box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+            }
+
+            [data-theme="system"] .settings-heading p,
+            [data-theme="system"] .section-heading p,
+            [data-theme="system"] .profile-card p,
+            [data-theme="system"] .security-item p,
+            [data-theme="system"] .preference-item p,
+            [data-theme="system"] .theme-info p {
+              color: #94a3b8;
+            }
+
+            [data-theme="system"] .theme-card {
+              background: #1e293b;
+              border-color: #334155;
+            }
+
+            [data-theme="system"] .theme-card.active {
+              background: rgba(37, 99, 235, 0.18);
+              border-color: #3b82f6;
+            }
+
+            [data-theme="system"] .theme-card-icon {
+              background: #0f172a;
+            }
+
+            [data-theme="system"] .profile-card,
+            [data-theme="system"] .security-item,
+            [data-theme="system"] .preference-item,
+            [data-theme="system"] .quick-action-btn {
+              background: #1e293b;
+              border-color: #334155;
+              color: #f8fafc;
+            }
+
+            [data-theme="system"] .info-item span {
+              color: #e2e8f0;
+            }
+
+            [data-theme="system"] .edit-field input {
+              background: #0f172a;
+              border-color: #334155;
+              color: #f8fafc;
+            }
           }
 
         `}

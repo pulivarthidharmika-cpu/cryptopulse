@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   Routes,
   Route,
@@ -20,6 +21,19 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 
 function App() {
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+
+    const handleStorage = () => {
+      const current = localStorage.getItem("theme") || "light";
+      document.documentElement.setAttribute("data-theme", current);
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
   return (
     <Routes>
 

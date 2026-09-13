@@ -1,7 +1,28 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
+
+  const [theme, setTheme] = useState(
+    localStorage.getItem("theme") || "light"
+  );
+
+  useEffect(() => {
+    const handleStorage = () => {
+      setTheme(localStorage.getItem("theme") || "light");
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    window.dispatchEvent(new Event("storage"));
+  };
 
   return (
     <header className="navbar">
@@ -38,6 +59,15 @@ function Navbar({ onMenuClick }) {
           <span className="status-dot"></span>
           <span>Live</span>
         </div>
+
+        <button
+          className="theme-toggle-button"
+          onClick={toggleTheme}
+          title={`Theme: ${theme}. Click to switch.`}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? "☀️" : "🌙"}
+        </button>
 
         <button
           className="notification-button"
@@ -217,7 +247,8 @@ function Navbar({ onMenuClick }) {
 
 
           .notification-button,
-          .profile-button {
+          .profile-button,
+          .theme-toggle-button {
             width: 40px;
             height: 40px;
 
@@ -232,6 +263,7 @@ function Navbar({ onMenuClick }) {
             background: var(--button-bg);
 
             cursor: pointer;
+            font-size: 17px;
 
             transition:
               transform 0.2s ease,
@@ -241,7 +273,8 @@ function Navbar({ onMenuClick }) {
 
 
           .notification-button:hover,
-          .profile-button:hover {
+          .profile-button:hover,
+          .theme-toggle-button:hover {
             transform: translateY(-2px);
 
             background: var(--button-hover);
