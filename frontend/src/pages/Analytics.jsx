@@ -11,6 +11,7 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
+  Legend as RechartsLegend,
 } from "recharts";
 
 import {
@@ -65,6 +66,9 @@ function Analytics() {
   const [history, setHistory] = useState([]);
   const [ohlc, setOhlc] = useState([]);
   const [volumeData, setVolumeData] = useState(null);
+  const [comparativeData, setComparativeData] = useState(null);
+  const [chartMode, setChartMode] = useState("single");
+  const [timeframeLimit, setTimeframeLimit] = useState(60);
 
   const [selectedCoin, setSelectedCoin] = useState("bitcoin");
 
@@ -198,13 +202,42 @@ function Analytics() {
 
 
   /* ============================================================
+     FETCH COMPARATIVE PERFORMANCE
+  ============================================================ */
+
+  const fetchComparative = async () => {
+    try {
+      const response = await fetch(
+        `${BASE_URL}/analytics/comparative?limit=${timeframeLimit}`
+      );
+      if (response.ok) {
+        const result = await response.json();
+        setComparativeData(result);
+      }
+    } catch (err) {
+      console.error("Comparative fetch error:", err);
+    }
+  };
+
+
+  /* ============================================================
      INITIAL LOAD + AUTO REFRESH
   ============================================================ */
 
   useEffect(() => {
     fetchHistory(true);
     fetchVolume();
+    fetchComparative();
   }, []);
+
+
+  /* ============================================================
+     REFETCH COMPARATIVE WHEN TIMEFRAME CHANGES
+  ============================================================ */
+
+  useEffect(() => {
+    fetchComparative();
+  }, [timeframeLimit]);
 
 
   /* ============================================================
@@ -225,12 +258,13 @@ function Analytics() {
       fetchHistory(false);
       fetchOHLC();
       fetchVolume();
+      fetchComparative();
     }, 5000);
 
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [selectedCoin]);
+  }, [selectedCoin, timeframeLimit]);
 
 
   /* ============================================================
@@ -593,6 +627,7 @@ function Analytics() {
             fetchHistory(true);
             fetchOHLC();
             fetchVolume();
+            fetchComparative();
           }}
           style={styles.refreshButton}
         >
@@ -1147,7 +1182,7 @@ function Analytics() {
 
 
           {/* ======================================================
-              HISTORICAL LINE CHART
+              HISTORICAL PRICE & COMPARATIVE TREND CHART
           ====================================================== */}
 
           <div
@@ -1162,17 +1197,27 @@ function Analytics() {
             }}
           >
 
-            <div style={styles.chartHeader}>
+            <div
+              style={{
+                ...styles.chartHeader,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: "12px",
+              }}
+            >
 
               <div>
-
                 <h2
                   style={{
                     ...styles.sectionTitle,
                     color: colors.title,
                   }}
                 >
-                  {coinName} Price History
+                  {chartMode === "comparative"
+                    ? "Comparative Asset Trend Analysis"
+                    : `${coinName} Price History`}
                 </h2>
 
                 <p
@@ -1181,103 +1226,264 @@ function Analytics() {
                     color: colors.muted,
                   }}
                 >
-                  Historical price movement ·
-                  Live updates enabled
+                  {chartMode === "comparative"
+                    ? "Normalized % performance comparison across tracked assets"
+                    : "Historical price movement · Live updates enabled"}
                 </p>
+              </div>
 
+              {/* View mode and Timeframe Controls */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    onClick={() => setChartMode("single")}
+                    style={styles.viewModeButton(chartMode === "single", isDark)}
+                  >
+                    Single Asset ($)
+                  </button>
+                  <button
+                    onClick={() => setChartMode("comparative")}
+                    style={styles.viewModeButton(chartMode === "comparative", isDark)}
+                  >
+                    Comparative Trend (%)
+                  </button>
+                </div>
+
+                {chartMode === "comparative" && (
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", color: colors.muted, marginRight: "4px" }}>
+                      Points:
+                    </span>
+                    {[15, 30, 60, 120].map((pts) => (
+                      <button
+                        key={pts}
+                        onClick={() => setTimeframeLimit(pts)}
+                        style={styles.timeframeButton(timeframeLimit === pts, isDark)}
+                      >
+                        {pts}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>
 
-
-            {chartData.length === 0 ? (
-
-              <p
-                style={{
-                  ...styles.message,
-                  color: colors.muted,
-                }}
-              >
-                No historical data available
-                for {coinName}.
-              </p>
-
-            ) : (
-
-              <div style={styles.chart}>
-
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-
-                  <LineChart
-                    data={chartData}
-                  >
-
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke={
-                        isDark
-                          ? "#334155"
-                          : "#e5e7eb"
-                      }
-                    />
-
-
-                    <XAxis
-                      dataKey="time"
-                      stroke={
-                        isDark
-                          ? "#94a3b8"
-                          : "#6b7280"
-                      }
-                    />
-
-
-                    <YAxis
-                      stroke={
-                        isDark
-                          ? "#94a3b8"
-                          : "#6b7280"
-                      }
-                    />
-
-
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor:
-                          colors.card,
-                        border:
-                          `1px solid ${colors.border}`,
-                        color:
-                          colors.title,
-                        borderRadius:
-                          "8px",
+            {/* Comparative Summary Cards */}
+            {chartMode === "comparative" && comparativeData?.performance && (
+              <div style={{ ...styles.volumeGrid, marginBottom: "20px" }}>
+                {Object.entries(comparativeData.performance).map(([coinKey, perf]) => {
+                  const isPositive = (perf.period_return_pct || 0) >= 0;
+                  const isBest = comparativeData.best_performer === coinKey;
+                  return (
+                    <div
+                      key={coinKey}
+                      style={{
+                        ...styles.volumeCard,
+                        backgroundColor: colors.cardSecondary,
+                        border: isBest
+                          ? "2px solid #10b981"
+                          : `1px solid ${colors.border}`,
                       }}
-                      formatter={(value) =>
-                        `$${formatPrice(
-                          value
-                        )}`
-                      }
-                    />
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span
+                          style={{
+                            ...styles.statLabel,
+                            color: coinColors[coinKey] || colors.title,
+                            fontWeight: "700",
+                            textTransform: "capitalize",
+                            fontSize: "14px",
+                            margin: 0,
+                          }}
+                        >
+                          {coinKey}
+                        </span>
+                        {isBest && (
+                          <span
+                            style={{
+                              fontSize: "11px",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              backgroundColor: isDark ? "rgba(16, 185, 129, 0.2)" : "#d1fae5",
+                              color: isDark ? "#34d399" : "#047857",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Top Performer
+                          </span>
+                        )}
+                      </div>
 
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "6px" }}>
+                        <strong style={{ ...styles.statValue, color: colors.title }}>
+                          ${formatPrice(perf.latest_price)}
+                        </strong>
+                        <span
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: "700",
+                            color: isPositive ? "#16a34a" : "#dc2626",
+                          }}
+                        >
+                          {isPositive ? "+" : ""}
+                          {perf.period_return_pct}%
+                        </span>
+                      </div>
 
-                    <Line
-                      type="monotone"
-                      dataKey="price"
-                      stroke="#2563eb"
-                      strokeWidth={3}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-
-                  </LineChart>
-
-                </ResponsiveContainer>
-
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "11px",
+                          color: colors.muted,
+                          marginTop: "8px",
+                          borderTop: `1px solid ${colors.border}`,
+                          paddingTop: "6px",
+                        }}
+                      >
+                        <span>H: ${formatPrice(perf.highest_price)}</span>
+                        <span>L: ${formatPrice(perf.lowest_price)}</span>
+                        <span>Vol: {perf.volatility}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            )}
 
+            {/* Single Coin Line Chart */}
+            {chartMode === "single" && (
+              chartData.length === 0 ? (
+                <p
+                  style={{
+                    ...styles.message,
+                    color: colors.muted,
+                  }}
+                >
+                  No historical data available for {coinName}.
+                </p>
+              ) : (
+                <div style={styles.chart}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={isDark ? "#334155" : "#e5e7eb"}
+                      />
+                      <XAxis
+                        dataKey="time"
+                        stroke={isDark ? "#94a3b8" : "#6b7280"}
+                      />
+                      <YAxis
+                        stroke={isDark ? "#94a3b8" : "#6b7280"}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: colors.card,
+                          border: `1px solid ${colors.border}`,
+                          color: colors.title,
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value) => `$${formatPrice(value)}`}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="price"
+                        name={coinName}
+                        stroke="#2563eb"
+                        strokeWidth={3}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )
+            )}
+
+            {/* Comparative Multi-Coin % Chart */}
+            {chartMode === "comparative" && (
+              (!comparativeData?.normalized_series || comparativeData.normalized_series.length === 0) ? (
+                <p
+                  style={{
+                    ...styles.message,
+                    color: colors.muted,
+                  }}
+                >
+                  Loading comparative trend series...
+                </p>
+              ) : (
+                <div style={styles.chart}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={comparativeData.normalized_series}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke={isDark ? "#334155" : "#e5e7eb"}
+                      />
+                      <XAxis
+                        dataKey="time"
+                        stroke={isDark ? "#94a3b8" : "#6b7280"}
+                      />
+                      <YAxis
+                        stroke={isDark ? "#94a3b8" : "#6b7280"}
+                        tickFormatter={(val) => `${val > 0 ? "+" : ""}${val}%`}
+                      />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: colors.card,
+                          border: `1px solid ${colors.border}`,
+                          color: colors.title,
+                          borderRadius: "8px",
+                        }}
+                        formatter={(value, name, props) => {
+                          const coinKey = String(name).toLowerCase();
+                          const price = props?.payload?.[`${coinKey}_price`];
+                          const sign = value > 0 ? "+" : "";
+                          const priceStr = price ? ` ($${formatPrice(price)})` : "";
+                          return [`${sign}${value}%${priceStr}`, String(name).toUpperCase()];
+                        }}
+                      />
+                      <RechartsLegend
+                        verticalAlign="top"
+                        height={36}
+                        formatter={(value) => (
+                          <span style={{ color: colors.title, textTransform: "capitalize", fontWeight: "600" }}>
+                            {value}
+                          </span>
+                        )}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="bitcoin"
+                        name="Bitcoin"
+                        stroke="#f59e0b"
+                        strokeWidth={2.5}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="ethereum"
+                        name="Ethereum"
+                        stroke="#6366f1"
+                        strokeWidth={2.5}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="solana"
+                        name="Solana"
+                        stroke="#14b8a6"
+                        strokeWidth={2.5}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )
             )}
 
           </div>
@@ -1697,6 +1903,43 @@ const styles = {
     color: "#b91c1c",
     borderRadius: "8px",
   },
+
+
+  viewModeButton: (active, isDark) => ({
+    padding: "6px 12px",
+    borderRadius: "6px",
+    border: "1px solid",
+    borderColor: active ? "#2563eb" : isDark ? "#334155" : "#d1d5db",
+    backgroundColor: active ? "#2563eb" : "transparent",
+    color: active ? "white" : isDark ? "#cbd5e1" : "#4b5563",
+    fontSize: "13px",
+    fontWeight: active ? "600" : "400",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  }),
+
+
+  timeframeButton: (active, isDark) => ({
+    padding: "4px 10px",
+    borderRadius: "5px",
+    border: "1px solid",
+    borderColor: active ? "#10b981" : isDark ? "#334155" : "#e5e7eb",
+    backgroundColor: active
+      ? isDark
+        ? "rgba(16, 185, 129, 0.2)"
+        : "#d1fae5"
+      : "transparent",
+    color: active
+      ? isDark
+        ? "#34d399"
+        : "#047857"
+      : isDark
+      ? "#94a3b8"
+      : "#6b7280",
+    fontSize: "12px",
+    fontWeight: active ? "600" : "400",
+    cursor: "pointer",
+  }),
 };
 
 

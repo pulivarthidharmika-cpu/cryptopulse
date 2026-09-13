@@ -1009,3 +1009,123 @@ async def get_volume_analytics():
     except Exception as e:
         logger.error(f"Volume analytics calculation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================================================
+# COMPARATIVE HISTORICAL PERFORMANCE
+# GET /analytics/comparative
+#
+# Computes cross-asset normalized % return trends,
+# relative volatility, and performance ranking.
+# ==================================================
+
+@router.get("/comparative")
+async def get_comparative_analytics(limit: int = 60):
+    try:
+        limit = max(5, min(limit, 300))
+        performance = {}
+        time_series_by_coin = {}
+
+        for coin in SUPPORTED_COINS:
+            cursor = historical_prices_collection.find(
+                {"coin": coin},
+                {"_id": 0, "price": 1, "timestamp": 1, "volume": 1}
+            ).sort("timestamp", -1).limit(limit)
+
+            docs = []
+            async for doc in cursor:
+                if doc.get("price") is not None:
+                    docs.append(doc)
+            docs.reverse()
+            time_series_by_coin[coin] = docs
+
+            if docs:
+                prices = [float(d["price"]) for d in docs]
+                start_p = prices[0]
+                end_p = prices[-1]
+                ret_pct = (
+                    round(((end_p - start_p) / start_p) * 100, 2)
+                    if start_p > 0
+                    else 0.0
+                )
+                vol = calculate_volatility(prices)
+                performance[coin] = {
+                    "coin": coin,
+                    "start_price": start_p,
+                    "latest_price": end_p,
+                    "period_return_pct": ret_pct,
+                    "highest_price": max(prices),
+                    "lowest_price": min(prices),
+                    "volatility": vol,
+                    "data_points": len(prices),
+                }
+            else:
+                performance[coin] = {
+                    "coin": coin,
+                    "start_price": None,
+                    "latest_price": None,
+                    "period_return_pct": 0.0,
+                    "highest_price": None,
+                    "lowest_price": None,
+                    "volatility": 0.0,
+                    "data_points": 0,
+                }
+
+        max_len = max(
+            (len(docs) for docs in time_series_by_coin.values()),
+            default=0
+        )
+
+        base_prices = {
+            coin: docs[0]["price"] if docs and float(docs[0]["price"]) > 0 else None
+            for coin, docs in time_series_by_coin.items()
+        }
+
+        primary_coin = max(
+            time_series_by_coin.keys(),
+            key=lambda c: len(time_series_by_coin[c]),
+            default="bitcoin"
+        )
+        primary_docs = time_series_by_coin.get(primary_coin, [])
+
+        normalized_series = []
+        for idx, p_doc in enumerate(primary_docs):
+            ts = p_doc.get("timestamp")
+            time_str = str(ts)[11:19] if ts else f"T{idx}"
+            point = {
+                "index": idx,
+                "timestamp": ts,
+                "time": time_str,
+            }
+            for coin in SUPPORTED_COINS:
+                docs = time_series_by_coin.get(coin, [])
+                if idx < len(docs) and base_prices.get(coin):
+                    curr_price = float(docs[idx]["price"])
+                    base = float(base_prices[coin])
+                    pct_change = round(((curr_price - base) / base) * 100, 2)
+                    point[coin] = pct_change
+                    point[f"{coin}_price"] = curr_price
+                else:
+                    point[coin] = 0.0
+            normalized_series.append(point)
+
+        ranked = sorted(
+            performance.values(),
+            key=lambda x: x["period_return_pct"],
+            reverse=True
+        )
+
+        logger.info("Comparative analytics generated successfully")
+
+        return {
+            "status": "success",
+            "timeframe_points": max_len,
+            "best_performer": ranked[0]["coin"] if ranked else None,
+            "performance": performance,
+            "ranked": ranked,
+            "normalized_series": normalized_series,
+        }
+
+    except Exception as e:
+        logger.error(f"Comparative analytics failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
