@@ -130,6 +130,55 @@ function Dashboard() {
               : item
           );
         });
+
+        // Update Market Heatmap in real time from WebSocket stream
+        setHeatmapData((currentHeatmap) => {
+          if (!currentHeatmap || !currentHeatmap.data) {
+            return currentHeatmap;
+          }
+
+          const updatedList = currentHeatmap.data.map((item) => {
+            if (item.coin !== data.coin) {
+              return item;
+            }
+
+            const newPrice = data.price !== undefined ? Number(data.price) : item.price;
+            const newChange = data.change_24h !== undefined ? Number(data.change_24h) : item.change_24h;
+            const newVolume = data.volume !== undefined ? Number(data.volume) : item.volume_24h;
+
+            let heatColor = item.heat_color;
+            if (newChange >= 5.0) heatColor = "#15803d";
+            else if (newChange >= 2.0) heatColor = "#22c55e";
+            else if (newChange > 0.0) heatColor = "#86efac";
+            else if (newChange === 0.0) heatColor = "#94a3b8";
+            else if (newChange >= -2.0) heatColor = "#fca5a5";
+            else if (newChange >= -5.0) heatColor = "#ef4444";
+            else heatColor = "#b91c1c";
+
+            return {
+              ...item,
+              price: newPrice,
+              change_24h: newChange,
+              volume_24h: newVolume,
+              heat_color: heatColor,
+              sentiment: newChange > 0 ? "bullish" : (newChange < 0 ? "bearish" : "neutral"),
+              intensity: Math.min(Math.max(Number((Math.abs(newChange) / 5.0).toFixed(2)), 0.1), 1.0),
+              lastUpdated: Date.now(),
+            };
+          });
+
+          const topPerformer =
+            [...updatedList].sort((a, b) => b.change_24h - a.change_24h)[0] || null;
+          const worstPerformer =
+            [...updatedList].sort((a, b) => a.change_24h - b.change_24h)[0] || null;
+
+          return {
+            ...currentHeatmap,
+            data: updatedList,
+            top_performer: topPerformer,
+            worst_performer: worstPerformer,
+          };
+        });
       },
 
       onClose: () => {
