@@ -2,8 +2,8 @@
 # Import HTTPException to return proper error responses
 from fastapi import APIRouter, HTTPException
 
-# Import MongoDB historical prices collection
-from database.database import historical_prices_collection
+# Import MongoDB collections
+from database.database import historical_prices_collection, live_prices_collection
 
 # Import logger to store success/error logs
 from utils.logger import logger
@@ -685,3 +685,108 @@ async def get_ohlc(
             status_code=500,
             detail=str(e)
         )
+
+
+# ==================================================
+# MARKET HEATMAP DATA
+# GET /analytics/heatmap
+#
+# Generates relative market cap sizing, 24h percentage
+# changes, visual heat colors, and intensity ratings.
+# ==================================================
+
+@router.get("/heatmap")
+async def get_heatmap():
+    try:
+        symbols_map = {
+            "bitcoin": "BTC",
+            "ethereum": "ETH",
+            "solana": "SOL",
+        }
+
+        # Fetch latest prices for supported coins
+        cursor = live_prices_collection.find(
+            {"coin": {"$in": SUPPORTED_COINS}},
+            {"_id": 0}
+        )
+
+        live_data = {}
+        async for doc in cursor:
+            live_data[doc.get("coin")] = doc
+
+        items = []
+        total_market_cap = 0.0
+        total_volume = 0.0
+
+        for coin in SUPPORTED_COINS:
+            doc = live_data.get(coin, {})
+            price = float(doc.get("price") or 0.0)
+            market_cap = float(doc.get("market_cap") or 0.0)
+            volume = float(doc.get("volume") or 0.0)
+            change = float(doc.get("change_24h") or 0.0)
+
+            total_market_cap += market_cap
+            total_volume += volume
+
+            # Determine heat color based on percentage change
+            if change >= 5.0:
+                heat_color = "#15803d"  # dark green
+            elif change >= 2.0:
+                heat_color = "#22c55e"  # green
+            elif change > 0.0:
+                heat_color = "#86efac"  # light green
+            elif change == 0.0:
+                heat_color = "#94a3b8"  # slate / neutral
+            elif change >= -2.0:
+                heat_color = "#fca5a5"  # light red
+            elif change >= -5.0:
+                heat_color = "#ef4444"  # red
+            else:
+                heat_color = "#b91c1c"  # dark red
+
+            sentiment = (
+                "bullish" if change > 0 else ("bearish" if change < 0 else "neutral")
+            )
+
+            items.append({
+                "coin": coin,
+                "symbol": symbols_map.get(coin, coin.upper()[:4]),
+                "price": price,
+                "change_24h": round(change, 2),
+                "market_cap": market_cap,
+                "volume_24h": volume,
+                "sentiment": sentiment,
+                "heat_color": heat_color,
+                "intensity": min(max(round(abs(change) / 5.0, 2), 0.1), 1.0)
+            })
+
+        # Calculate market cap percentage share for tile sizing
+        for item in items:
+            item["market_cap_share"] = (
+                round((item["market_cap"] / total_market_cap) * 100, 2)
+                if total_market_cap > 0
+                else round(100.0 / len(items), 2)
+            )
+
+        # Sort items by market cap share descending
+        items.sort(key=lambda x: x["market_cap"], reverse=True)
+
+        top_performer = max(items, key=lambda x: x["change_24h"]) if items else None
+        worst_performer = min(items, key=lambda x: x["change_24h"]) if items else None
+
+        logger.info("Cryptocurrency heatmap generated successfully")
+
+        return {
+            "status": "success",
+            "total_market_cap": round(total_market_cap, 2),
+            "total_volume": round(total_volume, 2),
+            "dominant_coin": items[0]["coin"] if items else None,
+            "top_performer": top_performer,
+            "worst_performer": worst_performer,
+            "count": len(items),
+            "data": items
+        }
+
+    except Exception as e:
+        logger.error(f"Heatmap generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
