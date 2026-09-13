@@ -355,6 +355,69 @@ function Dashboard() {
       </div>
 
 
+      {/* ================= LIVE ALERT NOTIFICATIONS ================= */}
+      {liveAlerts.length > 0 && (
+        <div className="live-alerts-container">
+          <div className="live-alerts-header">
+            <div className="alerts-title-wrap">
+              <span className="alert-bell-icon">🔔</span>
+              <strong>Active Market Alerts ({liveAlerts.length})</strong>
+              <span className="alerts-live-pulse">LIVE</span>
+            </div>
+            <button
+              onClick={() => setLiveAlerts([])}
+              className="alerts-clear-btn"
+            >
+              Clear All
+            </button>
+          </div>
+
+          <div className="live-alerts-list">
+            {liveAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="live-alert-card"
+                style={{
+                  borderLeftColor: getCoinColor(alert.coin),
+                }}
+              >
+                <div className="alert-card-left">
+                  <span
+                    className="alert-coin-badge"
+                    style={{
+                      backgroundColor: `${getCoinColor(alert.coin)}20`,
+                      color: getCoinColor(alert.coin),
+                    }}
+                  >
+                    {alert.coin ? alert.coin.toUpperCase() : "ALERT"}
+                  </span>
+                  <div className="alert-text-group">
+                    <p className="alert-main-msg">
+                      {alert.message ||
+                        `Price crossed ${alert.condition} $${formatPrice(alert.target_price)} (now $${formatPrice(alert.current_price)})`}
+                    </p>
+                    <span className="alert-time">
+                      Triggered at {alert.receivedAt || "just now"}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() =>
+                    setLiveAlerts((prev) => prev.filter((a) => a.id !== alert.id))
+                  }
+                  className="alert-dismiss-btn"
+                  title="Dismiss alert"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       {/* ================= MARKET STATUS ================= */}
 
       <div className="market-banner">
@@ -501,14 +564,25 @@ function Dashboard() {
 
             </div>
 
-          <span className={`updated ws-status ${wsStatus}`}>
-            ●{" "}
-            {wsStatus === "connected"
-            ? "WebSocket Connected"
-            : wsStatus === "connecting"
-            ? "WebSocket Connecting..."
-            : "WebSocket Disconnected"}
-          </span>
+          <div className="status-badges-group">
+            <span className={`updated ws-status ${wsStatus}`}>
+              ●{" "}
+              {wsStatus === "connected"
+              ? "Prices Live"
+              : wsStatus === "connecting"
+              ? "Prices Connecting..."
+              : "Prices Offline"}
+            </span>
+
+            <span className={`updated ws-status ${alertWsStatus}`}>
+              🔔{" "}
+              {alertWsStatus === "connected"
+              ? "Alerts Live"
+              : alertWsStatus === "connecting"
+              ? "Alerts Connecting..."
+              : "Alerts Offline"}
+            </span>
+          </div>
 
           </div>
 
@@ -2001,6 +2075,174 @@ function Dashboard() {
 
           .regime-badge strong {
             color: var(--text-primary);
+          }
+
+
+          /* ================= LIVE ALERTS ================= */
+
+          .live-alerts-container {
+            background: var(--card-bg);
+            border: 1px solid #f59e0b;
+            border-radius: 18px;
+            padding: 18px 24px;
+            margin-bottom: 25px;
+            box-shadow: 0 6px 24px rgba(245, 158, 11, 0.18);
+            animation: slideDownAlert 0.3s ease;
+          }
+
+          @keyframes slideDownAlert {
+            from {
+              opacity: 0;
+              transform: translateY(-10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+
+          .live-alerts-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+          }
+
+          .alerts-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+
+          .alert-bell-icon {
+            font-size: 18px;
+            animation: ringBell 2s infinite ease-in-out;
+          }
+
+          @keyframes ringBell {
+            0%, 100% { transform: rotate(0); }
+            10%, 30% { transform: rotate(14deg); }
+            20%, 40% { transform: rotate(-14deg); }
+            50% { transform: rotate(0); }
+          }
+
+          .alerts-title-wrap strong {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+          }
+
+          .alerts-live-pulse {
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+          }
+
+          .alerts-clear-btn {
+            background: none;
+            border: 1px solid var(--border-color);
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
+
+          .alerts-clear-btn:hover {
+            background: var(--stat-bg);
+            color: var(--text-primary);
+          }
+
+          .live-alerts-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+
+          .live-alert-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--stat-bg);
+            border: 1px solid var(--border-color);
+            border-left: 4px solid #f59e0b;
+            border-radius: 12px;
+            padding: 12px 18px;
+            gap: 16px;
+            transition: transform 0.15s ease;
+          }
+
+          .live-alert-card:hover {
+            transform: translateX(3px);
+          }
+
+          .alert-card-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex: 1;
+            min-width: 0;
+          }
+
+          .alert-coin-badge {
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
+          }
+
+          .alert-text-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+          }
+
+          .alert-main-msg {
+            margin: 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+
+          .alert-time {
+            font-size: 11px;
+            color: var(--text-muted);
+          }
+
+          .alert-dismiss-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 16px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: color 0.15s ease;
+          }
+
+          .alert-dismiss-btn:hover {
+            color: #dc2626;
+          }
+
+          .status-badges-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
           }
 
 
