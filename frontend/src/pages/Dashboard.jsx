@@ -22,6 +22,9 @@ function Dashboard() {
   losers: [],
 });
 
+ const [heatmapData, setHeatmapData] = useState(null);
+ const [heatmapLoading, setHeatmapLoading] = useState(true);
+
   const fetchPrices = async () => {
     try {
       setLoading(true);
@@ -67,18 +70,39 @@ function Dashboard() {
   }
 };
 
+  const fetchHeatmap = async () => {
+    try {
+      setHeatmapLoading(true);
+      const response = await fetch(`${BASE_URL}/analytics/heatmap`);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch market heatmap");
+      }
+
+      const result = await response.json();
+      setHeatmapData(result);
+    } catch (err) {
+      console.error("Heatmap fetch error:", err);
+    } finally {
+      setHeatmapLoading(false);
+    }
+  };
+
   const handleRefresh = () => {
     fetchPrices();
     fetchGainersAndLosers();
+    fetchHeatmap();
   };
 
  useEffect(() => {
   fetchPrices();
   fetchGainersAndLosers();
+  fetchHeatmap();
 
   const interval = setInterval(() => {
     fetchPrices();
     fetchGainersAndLosers();
+    fetchHeatmap();
   }, 30000);
 
   return () => clearInterval(interval);
@@ -636,6 +660,123 @@ function Dashboard() {
   </div>
 
 </div>
+
+
+          {/* ================= MARKET HEATMAP ================= */}
+
+          <div className="market-heatmap-section">
+
+            <div className="heatmap-header">
+
+              <div>
+                <h2 className="heatmap-title">
+                  Cryptocurrency Market Heatmap
+                </h2>
+
+                <p className="heatmap-subtitle">
+                  Market cap dominance weighting & 24-hour price performance distribution
+                </p>
+              </div>
+
+              {heatmapData && (
+                <div className="heatmap-metrics-bar">
+                  <div className="heatmap-metric-chip">
+                    <span>Dominant Asset:</span>
+                    <strong>{heatmapData.dominant_coin ? heatmapData.dominant_coin.toUpperCase() : "N/A"}</strong>
+                  </div>
+                  {heatmapData.top_performer && (
+                    <div className="heatmap-metric-chip gain">
+                      <span>Top Gainer:</span>
+                      <strong>
+                        {heatmapData.top_performer.symbol} (+{heatmapData.top_performer.change_24h}%)
+                      </strong>
+                    </div>
+                  )}
+                  {heatmapData.worst_performer && (
+                    <div className="heatmap-metric-chip loss">
+                      <span>Weakest:</span>
+                      <strong>
+                        {heatmapData.worst_performer.symbol} ({heatmapData.worst_performer.change_24h}%)
+                      </strong>
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {heatmapLoading && !heatmapData ? (
+              <div className="heatmap-empty">
+                Loading market heatmap...
+              </div>
+            ) : heatmapData?.data && heatmapData.data.length > 0 ? (
+              <div className="heatmap-treemap-grid">
+                {heatmapData.data.map((item) => {
+                  const share = item.market_cap_share || 33.3;
+                  const flexBasis = share > 50 ? "55%" : share > 10 ? "25%" : "15%";
+
+                  return (
+                    <div
+                      key={`heatmap-${item.coin}`}
+                      className="heatmap-tile"
+                      style={{
+                        flexBasis,
+                        flexGrow: Math.max(Math.round(share), 1),
+                        borderTop: `4px solid ${item.heat_color}`,
+                      }}
+                    >
+                      <div className="tile-top-row">
+                        <div className="tile-symbol-badge">
+                          <span
+                            className="tile-icon-dot"
+                            style={{ backgroundColor: getCoinColor(item.coin) }}
+                          ></span>
+                          <strong>{item.symbol}</strong>
+                          <span className="tile-coin-name">
+                            {item.coin.charAt(0).toUpperCase() + item.coin.slice(1)}
+                          </span>
+                        </div>
+
+                        <span
+                          className="tile-change-pill"
+                          style={{
+                            backgroundColor: `${item.heat_color}25`,
+                            color: item.heat_color,
+                          }}
+                        >
+                          {item.change_24h >= 0 ? `+${item.change_24h}` : item.change_24h}%
+                        </span>
+                      </div>
+
+                      <div className="tile-main-price">
+                        ${formatPrice(item.price)}
+                      </div>
+
+                      <div className="tile-footer-meta">
+                        <div className="tile-meta-item">
+                          <span>Market Share</span>
+                          <strong>{item.market_cap_share}%</strong>
+                        </div>
+                        <div className="tile-meta-item">
+                          <span>24h Volume</span>
+                          <strong>{formatLargeNumber(item.volume_24h)}</strong>
+                        </div>
+                        <div className="tile-meta-item">
+                          <span>Market Cap</span>
+                          <strong>{formatLargeNumber(item.market_cap)}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="heatmap-empty">
+                No market heatmap data currently available.
+              </div>
+            )}
+
+          </div>
 
 
           {/* ================= MARKET SUMMARY ================= */}
@@ -1399,6 +1540,189 @@ function Dashboard() {
             color: var(--text-muted);
             background: var(--stat-bg);
             border-radius: 12px;
+            border: 1px dashed var(--border-color);
+          }
+
+
+          /* ================= MARKET HEATMAP ================= */
+
+          .market-heatmap-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 26px 28px;
+            margin-bottom: 35px;
+            box-shadow: 0 6px 20px var(--card-shadow);
+          }
+
+          .heatmap-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 16px;
+          }
+
+          .heatmap-title {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.4px;
+          }
+
+          .heatmap-subtitle {
+            margin: 4px 0 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+          }
+
+          .heatmap-metrics-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+
+          .heatmap-metric-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: var(--stat-bg);
+            border: 1px solid var(--border-color);
+            font-size: 12px;
+          }
+
+          .heatmap-metric-chip span {
+            color: var(--text-secondary);
+          }
+
+          .heatmap-metric-chip strong {
+            color: var(--text-primary);
+            font-weight: 700;
+          }
+
+          .heatmap-metric-chip.gain strong {
+            color: #16a34a;
+          }
+
+          .heatmap-metric-chip.loss strong {
+            color: #dc2626;
+          }
+
+          .heatmap-treemap-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 18px;
+            min-height: 190px;
+          }
+
+          .heatmap-tile {
+            background: var(--stat-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-width: 240px;
+            min-height: 170px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            position: relative;
+            overflow: hidden;
+          }
+
+          .heatmap-tile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px var(--card-shadow);
+          }
+
+          .tile-top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+          }
+
+          .tile-symbol-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+
+          .tile-icon-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+          }
+
+          .tile-symbol-badge strong {
+            font-size: 16px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.2px;
+          }
+
+          .tile-coin-name {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+          }
+
+          .tile-change-pill {
+            padding: 4px 10px;
+            border-radius: 14px;
+            font-size: 12px;
+            font-weight: 700;
+          }
+
+          .tile-main-price {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.6px;
+            margin: 6px 0 16px;
+          }
+
+          .tile-footer-meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border-color);
+          }
+
+          .tile-meta-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+          }
+
+          .tile-meta-item span {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+          }
+
+          .tile-meta-item strong {
+            font-size: 12px;
+            color: var(--text-primary);
+            font-weight: 600;
+          }
+
+          .heatmap-empty {
+            padding: 40px 16px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+            background: var(--stat-bg);
+            border-radius: 14px;
             border: 1px dashed var(--border-color);
           }
 
