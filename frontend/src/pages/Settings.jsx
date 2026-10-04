@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function Settings() {
   // --------------------------------------------------
-  // Profile
+  // Profile & Account
   // --------------------------------------------------
 
   const storedEmail =
@@ -15,6 +17,15 @@ function Settings() {
   const [name, setName] = useState(storedName);
   const [email] = useState(storedEmail);
 
+  const [accountData, setAccountData] = useState({
+    name: storedName,
+    email: storedEmail,
+    role: localStorage.getItem("role") || "user",
+    status: "Active",
+    account_type: localStorage.getItem("role") === "admin" ? "System Administrator" : "Standard Trader",
+    session_active: true,
+  });
+
   const [editingProfile, setEditingProfile] =
     useState(false);
 
@@ -23,6 +34,34 @@ function Settings() {
 
   const [profileMessage, setProfileMessage] =
     useState("");
+
+  useEffect(() => {
+    const fetchAccount = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${BASE_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setAccountData(data);
+          if (data.name && !localStorage.getItem("profileName")) {
+            setName(data.name);
+            setEditName(data.name);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch user account details:", err);
+      }
+    };
+
+    fetchAccount();
+  }, []);
 
   // --------------------------------------------------
   // Notifications
@@ -123,21 +162,7 @@ function Settings() {
     }, 1200);
   };
 
-  // --------------------------------------------------
-  // Account Options
-  // --------------------------------------------------
 
-  const handleSecurity = () => {
-    alert(
-      "Security settings will be available in a future update."
-    );
-  };
-
-  const handlePreferences = () => {
-    alert(
-      "Application preferences will be available in a future update."
-    );
-  };
 
   return (
     <div className="settings-page">
@@ -457,76 +482,55 @@ function Settings() {
           </div>
 
           <div>
-            <h2>Account</h2>
+            <h2>Account Details</h2>
 
             <p>
-              Manage your account preferences.
+              Your authenticated CryptoPulse account information.
             </p>
           </div>
 
         </div>
 
+        <div className="account-details-grid">
 
-        <div className="account-options">
+          <div className="account-detail-card">
+            <span className="account-detail-label">Display Name</span>
+            <strong className="account-detail-val">{name || accountData.name}</strong>
+          </div>
 
-          {/* Security */}
+          <div className="account-detail-card">
+            <span className="account-detail-label">Email Address</span>
+            <strong className="account-detail-val">{email || accountData.email}</strong>
+          </div>
 
-          <button
-            className="account-option"
-            onClick={handleSecurity}
-          >
-
-            <span>
-              🔑
-            </span>
-
-            <div>
-
-              <strong>
-                Security
-              </strong>
-
-              <small>
-                Manage account security
-              </small>
-
+          <div className="account-detail-card">
+            <span className="account-detail-label">Account Role</span>
+            <div className="account-role-badge-wrap">
+              <span className={`role-badge role-${(accountData.role || "user").toLowerCase()}`}>
+                {(accountData.role || "user").toUpperCase()}
+              </span>
+              <small className="account-type-text">{accountData.account_type || "Standard Trader"}</small>
             </div>
+          </div>
 
-            <b>
-              ›
-            </b>
-
-          </button>
-
-
-          {/* Preferences */}
-
-          <button
-            className="account-option"
-            onClick={handlePreferences}
-          >
-
-            <span>
-              ⚙️
-            </span>
-
-            <div>
-
-              <strong>
-                Preferences
-              </strong>
-
-              <small>
-                Manage application preferences
-              </small>
-
+          <div className="account-detail-card">
+            <span className="account-detail-label">Account Status</span>
+            <div className="account-status-wrap">
+              <span className="account-status-dot"></span>
+              <strong className="account-status-text">{accountData.status || "Active"}</strong>
             </div>
+          </div>
 
-            <b>
-              ›
-            </b>
-
-          </button>
+          <div className="account-detail-card full-width">
+            <span className="account-detail-label">Security & Access Privileges</span>
+            <p className="account-privilege-desc">
+              {accountData.role === "admin"
+                ? "Full administrative privileges: User role management, cryptocurrency catalog management, real-time alert monitoring, and system metrics."
+                : (accountData.role === "analyst"
+                  ? "Market analyst access: Live streaming ingestion, candlestick OHLC generation, cross-asset liquidity metrics, and price alert rules."
+                  : "Standard trader access: Live market tracking, personal price alerts, and cryptocurrency portfolio analytics.")}
+            </p>
+          </div>
 
         </div>
 
@@ -994,80 +998,129 @@ function Settings() {
 
           /* ================= ACCOUNT ================= */
 
-          .account-options {
-            display: flex;
+          /* ================= ACCOUNT DETAILS ================= */
 
-            flex-direction: column;
-
-            gap: 9px;
+          .account-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
           }
 
-          .account-option {
-            display: flex;
-
-            align-items: center;
-
-            gap: 13px;
-
-            width: 100%;
-
-            padding: 14px;
-
-            border:
-              1px solid #e2e8f0;
-
+          .account-detail-card {
+            padding: 16px;
             border-radius: 12px;
-
-            background: white;
-
-            text-align: left;
-
-            cursor: pointer;
-
-            transition:
-              background 0.2s ease,
-              border 0.2s ease,
-              transform 0.2s ease;
-          }
-
-          .account-option:hover {
             background: #f8fbff;
-
-            border-color: #bfdbfe;
-
-            transform: translateX(2px);
+            border: 1px solid #e0edff;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
           }
 
-          .account-option > span {
-            font-size: 17px;
+          .account-detail-card.full-width {
+            grid-column: 1 / -1;
           }
 
-          .account-option div {
-            flex: 1;
+          .account-detail-label {
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
           }
 
-          .account-option strong {
-            display: block;
-
+          .account-detail-val {
+            font-size: 15px;
             color: #172554;
+            font-weight: 700;
+            word-break: break-all;
+          }
 
+          .account-role-badge-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+          }
+
+          .role-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+          }
+
+          .role-admin {
+            background: rgba(37, 99, 235, 0.15);
+            color: #2563eb;
+            border: 1px solid rgba(37, 99, 235, 0.3);
+          }
+
+          .role-analyst {
+            background: rgba(16, 185, 129, 0.15);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+          }
+
+          .role-user {
+            background: rgba(100, 116, 139, 0.15);
+            color: #475569;
+            border: 1px solid rgba(100, 116, 139, 0.3);
+          }
+
+          .account-type-text {
+            color: #64748b;
             font-size: 12px;
+            font-weight: 600;
           }
 
-          .account-option small {
-            display: block;
-
-            margin-top: 3px;
-
-            color: #94a3b8;
-
-            font-size: 9px;
+          .account-status-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
           }
 
-          .account-option b {
-            color: #94a3b8;
+          .account-status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+          }
 
-            font-size: 20px;
+          .account-status-text {
+            color: #16a34a;
+            font-size: 14px;
+            font-weight: 700;
+          }
+
+          .account-privilege-desc {
+            margin: 0;
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.6;
+          }
+
+          [data-theme="dark"] .account-detail-card {
+            background: #1e293b;
+            border-color: #334155;
+          }
+
+          [data-theme="dark"] .account-detail-label {
+            color: #94a3b8;
+          }
+
+          [data-theme="dark"] .account-detail-val {
+            color: #f8fafc;
+          }
+
+          [data-theme="dark"] .account-type-text {
+            color: #cbd5e1;
+          }
+
+          [data-theme="dark"] .account-privilege-desc {
+            color: #94a3b8;
           }
 
 

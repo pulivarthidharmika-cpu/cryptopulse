@@ -8,7 +8,8 @@ from config.settings import ADMIN_EMAIL
 from services.auth_service import (
     hash_password,
     verify_password,
-    create_access_token
+    create_access_token,
+    get_current_user
 )
 
 
@@ -145,3 +146,39 @@ async def login(
         "name": user.get("name", "User"),
         "role": role
     }
+
+
+# --------------------------------------------------
+# Get Current Authenticated User Profile
+# --------------------------------------------------
+
+@router.get("/me")
+async def get_me(
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        user = await users_collection.find_one(
+            {"email": {"$regex": f"^{re.escape(current_user['email'])}$", "$options": "i"}}
+        )
+
+        role = user.get("role", current_user.get("role", "user")) if user else current_user.get("role", "user")
+        name = user.get("name", current_user.get("name", "CryptoPulse User")) if user else current_user.get("name", "CryptoPulse User")
+        email = user["email"] if user else current_user["email"]
+
+        return {
+            "name": name,
+            "email": email,
+            "role": role,
+            "status": "Active",
+            "account_type": "System Administrator" if role == "admin" else ("Market Analyst" if role == "analyst" else "Standard Trader"),
+            "session_active": True
+        }
+    except Exception:
+        return {
+            "name": current_user.get("name", "CryptoPulse User"),
+            "email": current_user.get("email", ""),
+            "role": current_user.get("role", "user"),
+            "status": "Active",
+            "account_type": "Standard Trader",
+            "session_active": True
+        }
