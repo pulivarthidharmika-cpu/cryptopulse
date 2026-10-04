@@ -7,25 +7,50 @@ export async function loginUser(email, password) {
   formData.append("username", email);
   formData.append("password", password);
 
-  const response = await fetch(
-    `${BASE_URL}/auth/login`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
-      body: formData.toString(),
-    }
-  );
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.detail || "Login failed"
+  try {
+    const response = await fetch(
+      `${BASE_URL}/auth/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+        body: formData.toString(),
+        signal: controller.signal,
+      }
     );
-  }
 
-  return data;
+    clearTimeout(timeoutId);
+
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = { detail: `Server responded with status ${response.status}` };
+    }
+
+    if (!response.ok) {
+      let detailMsg = "Login failed";
+      if (typeof data?.detail === "string") {
+        detailMsg = data.detail;
+      } else if (Array.isArray(data?.detail)) {
+        detailMsg = data.detail
+          .map((item) => (typeof item === "string" ? item : item.msg || JSON.stringify(item)))
+          .join(", ");
+      }
+      throw new Error(detailMsg);
+    }
+
+    return data;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === "AbortError") {
+      throw new Error("Login request timed out. Please verify your connection.");
+    }
+    throw err;
+  }
 }
