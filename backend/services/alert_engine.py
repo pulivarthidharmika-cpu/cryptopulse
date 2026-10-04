@@ -128,7 +128,7 @@ async def check_alerts():
                         {
                             "$set": {
                                 "status": "triggered",
-                                "triggered_at": now,
+                                "triggered_at": now.isoformat(),
                                 "current_price": current_price
                             }
                         }
@@ -152,7 +152,8 @@ async def check_alerts():
                     alert_payload = {
                         "alert_id": str(alert["_id"]),
                         "coin": coin,
-                        "user_id": alert.get("user_id", "system"),
+                        "user_id": alert.get("user_id", alert.get("user_email", "system")),
+                        "user_email": alert.get("user_email", alert.get("user_id", "system")),
                         "condition": condition,
                         "target_price": target_price,
                         "current_price": current_price,
@@ -172,6 +173,14 @@ async def check_alerts():
                     except Exception as pe:
                         logger.warning(
                             f"Failed to publish alert for {coin} to Kafka: {str(pe)}"
+                        )
+
+                    try:
+                        from routers.alert_routes import alert_websocket_manager
+                        await alert_websocket_manager.broadcast(alert_payload)
+                    except Exception as we:
+                        logger.warning(
+                            f"Direct alert WebSocket broadcast failed: {str(we)}"
                         )
 
             # ------------------------------------------
