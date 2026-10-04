@@ -185,19 +185,22 @@ function Register() {
               required
             />
 
-            <button
-              type="button"
-              onClick={() =>
-                setShowPassword(
-                  !showPassword
-                )
-              }
-              style={styles.eyeButton}
-            >
-              {showPassword
-                ? "🙈"
-                : "👁"}
-            </button>
+            {/* Show Password */}
+            <label style={styles.showPassword}>
+              <input
+                type="checkbox"
+                checked={showPassword}
+                onChange={(e) =>
+                  setShowPassword(
+                    e.target.checked
+                  )
+                }
+                style={styles.checkbox}
+              />
+              <span>
+                Show password
+              </span>
+            </label>
 
           </div>
 
@@ -526,7 +529,7 @@ const styles = {
 
   passwordInput: {
     width: "100%",
-    padding: "14px 50px 14px 14px",
+    padding: "14px 16px",
     boxSizing: "border-box",
     border:
       "1px solid rgba(148,163,184,.3)",
@@ -537,15 +540,23 @@ const styles = {
     fontSize: "15px",
   },
 
-  eyeButton: {
-    position: "absolute",
-    right: "8px",
-    top: "50%",
-    transform: "translateY(-50%)",
-    border: "none",
-    background: "transparent",
+  showPassword: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginTop: "10px",
+    color: "#94a3b8",
+    fontSize: "13px",
     cursor: "pointer",
-    fontSize: "18px",
+    userSelect: "none",
+  },
+
+  checkbox: {
+    width: "15px",
+    height: "15px",
+    accentColor: "#3b82f6",
+    cursor: "pointer",
+    margin: 0,
   },
 
   error: {
