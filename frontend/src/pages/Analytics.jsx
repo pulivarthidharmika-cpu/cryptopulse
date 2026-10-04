@@ -1377,7 +1377,11 @@ function Analytics() {
                       "Volume",
                     ]}
                   />
-                  <Bar dataKey="volume" radius={[6, 6, 0, 0]}>
+                  <Bar
+                    dataKey="volume"
+                    radius={[6, 6, 0, 0]}
+                    isAnimationActive={false}
+                  >
                     {volumeChartData.map((entry) => (
                       <Cell
                         key={entry.coin}
