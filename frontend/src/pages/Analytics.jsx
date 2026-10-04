@@ -73,6 +73,7 @@ function Analytics() {
   const [timeframeLimit, setTimeframeLimit] = useState(60);
 
   const [selectedCoin, setSelectedCoin] = useState("bitcoin");
+  const [selectedHistoricalDate, setSelectedHistoricalDate] = useState("all");
   const [isStreaming, setIsStreaming] = useState(true);
   const [pollInterval, setPollInterval] = useState(5000);
   const [lastUpdated, setLastUpdated] = useState(new Date().toLocaleTimeString());
@@ -287,6 +288,24 @@ function Analytics() {
      FILTER SELECTED COIN
   ============================================================ */
 
+  useEffect(() => {
+    setSelectedHistoricalDate("all");
+  }, [selectedCoin]);
+
+  const getRecordDateKey = (ts) => {
+    if (!ts) return "";
+    if (typeof ts === "string" && ts.includes("T")) {
+      return ts.split("T")[0];
+    }
+    try {
+      const d = new Date(ts);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+      }
+    } catch {}
+    return "";
+  };
+
   const coinHistory = history
     .filter(
       (item) => item.coin === selectedCoin
@@ -296,6 +315,19 @@ function Analytics() {
         new Date(a.timestamp) -
         new Date(b.timestamp)
     );
+
+  const availableDates = Array.from(
+    new Set(
+      coinHistory
+        .map((item) => getRecordDateKey(item.timestamp))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => b.localeCompare(a));
+
+  const filteredTableRecords = coinHistory.filter((item) => {
+    if (selectedHistoricalDate === "all" || !selectedHistoricalDate) return true;
+    return getRecordDateKey(item.timestamp) === selectedHistoricalDate;
+  });
 
 
   /* ============================================================
@@ -1659,159 +1691,169 @@ function Analytics() {
             }}
           >
 
-            <h2
+            <div
               style={{
-                ...styles.sectionTitle,
-                color: colors.title,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "12px",
+                marginBottom: "16px",
               }}
             >
-              Historical Prices
-            </h2>
+              <h2
+                style={{
+                  ...styles.sectionTitle,
+                  color: colors.title,
+                  margin: 0,
+                }}
+              >
+                Historical Prices
+              </h2>
 
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <label
+                  htmlFor="historical-date-select"
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: colors.muted,
+                  }}
+                >
+                  Date:
+                </label>
+                <select
+                  id="historical-date-select"
+                  value={selectedHistoricalDate}
+                  onChange={(e) => setSelectedHistoricalDate(e.target.value)}
+                  style={{
+                    ...styles.select,
+                    width: "auto",
+                    minWidth: "160px",
+                    padding: "7px 12px",
+                    backgroundColor: colors.input,
+                    color: colors.text,
+                    border: `1px solid ${colors.border}`,
+                    cursor: "pointer",
+                    outline: "none",
+                  }}
+                >
+                  <option value="all">All Dates ({availableDates.length})</option>
+                  {availableDates.map((dateStr) => {
+                    let formatted = dateStr;
+                    try {
+                      formatted = new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      });
+                    } catch {}
+                    return (
+                      <option key={dateStr} value={dateStr}>
+                        {formatted}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
 
-            {coinHistory.length === 0 ? (
-
+            {filteredTableRecords.length === 0 ? (
               <p
                 style={{
                   ...styles.message,
                   color: colors.muted,
                 }}
               >
-                No historical records found.
+                {selectedHistoricalDate === "all"
+                  ? "No historical records found."
+                  : "No historical records found for this date."}
               </p>
-
             ) : (
-
-              <table
-                style={styles.table}
-              >
-
+              <table style={styles.table}>
                 <thead>
-
                   <tr>
-
                     <th
                       style={{
                         ...styles.th,
                         color: colors.title,
-                        borderBottom:
-                          `2px solid ${colors.border}`,
+                        borderBottom: `2px solid ${colors.border}`,
                       }}
                     >
                       Coin
                     </th>
-
-
                     <th
                       style={{
                         ...styles.th,
                         color: colors.title,
-                        borderBottom:
-                          `2px solid ${colors.border}`,
+                        borderBottom: `2px solid ${colors.border}`,
                       }}
                     >
                       Price
                     </th>
-
-
                     <th
                       style={{
                         ...styles.th,
                         color: colors.title,
-                        borderBottom:
-                          `2px solid ${colors.border}`,
+                        borderBottom: `2px solid ${colors.border}`,
                       }}
                     >
                       Currency
                     </th>
-
-
                     <th
                       style={{
                         ...styles.th,
                         color: colors.title,
-                        borderBottom:
-                          `2px solid ${colors.border}`,
+                        borderBottom: `2px solid ${colors.border}`,
                       }}
                     >
                       Timestamp
                     </th>
-
                   </tr>
-
                 </thead>
-
-
                 <tbody>
-
-                  {coinHistory.map(
-                    (item, index) => (
-
-                      <tr key={index}>
-
-                        <td
-                          style={{
-                            ...styles.td,
-                            color: colors.text,
-                            borderBottom:
-                              `1px solid ${colors.border}`,
-                          }}
-                        >
-                          {item.coin}
-                        </td>
-
-
-                        <td
-                          style={{
-                            ...styles.td,
-                            color: colors.text,
-                            borderBottom:
-                              `1px solid ${colors.border}`,
-                          }}
-                        >
-                          $
-                          {formatPrice(
-                            item.price
-                          )}
-                        </td>
-
-
-                        <td
-                          style={{
-                            ...styles.td,
-                            color: colors.text,
-                            borderBottom:
-                              `1px solid ${colors.border}`,
-                          }}
-                        >
-                          {item.currency
-                            ? item.currency.toUpperCase()
-                            : "USD"}
-                        </td>
-
-
-                        <td
-                          style={{
-                            ...styles.td,
-                            color: colors.text,
-                            borderBottom:
-                              `1px solid ${colors.border}`,
-                          }}
-                        >
-                          {new Date(
-                            item.timestamp
-                          ).toLocaleString()}
-                        </td>
-
-                      </tr>
-
-                    )
-                  )}
-
+                  {filteredTableRecords.map((item, index) => (
+                    <tr key={index}>
+                      <td
+                        style={{
+                          ...styles.td,
+                          color: colors.text,
+                          borderBottom: `1px solid ${colors.border}`,
+                        }}
+                      >
+                        {item.coin}
+                      </td>
+                      <td
+                        style={{
+                          ...styles.td,
+                          color: colors.text,
+                          borderBottom: `1px solid ${colors.border}`,
+                        }}
+                      >
+                        ${formatPrice(item.price)}
+                      </td>
+                      <td
+                        style={{
+                          ...styles.td,
+                          color: colors.text,
+                          borderBottom: `1px solid ${colors.border}`,
+                        }}
+                      >
+                        {item.currency ? item.currency.toUpperCase() : "USD"}
+                      </td>
+                      <td
+                        style={{
+                          ...styles.td,
+                          color: colors.text,
+                          borderBottom: `1px solid ${colors.border}`,
+                        }}
+                      >
+                        {new Date(item.timestamp).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
-
               </table>
-
             )}
 
           </div>
