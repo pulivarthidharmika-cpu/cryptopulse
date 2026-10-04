@@ -111,7 +111,12 @@ function Analytics() {
   }, []);
 
 
-  const isDark = theme === "dark";
+  const isSystemDark =
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  const isDark = theme === "dark" || (theme === "system" && isSystemDark);
 
 
   /* ============================================================
@@ -802,23 +807,42 @@ function Analytics() {
           }
           style={{
             ...styles.select,
-            backgroundColor:
-              colors.input,
+            colorScheme: isDark ? "dark" : "light",
+            backgroundColor: colors.input,
             color: colors.title,
-            borderColor:
-              colors.border,
+            borderColor: colors.border,
+            cursor: "pointer",
+            outline: "none",
           }}
         >
 
-          <option value="bitcoin">
+          <option
+            value="bitcoin"
+            style={{
+              backgroundColor: isDark ? "#1e293b" : "#ffffff",
+              color: isDark ? "#f8fafc" : "#111827",
+            }}
+          >
             Bitcoin
           </option>
 
-          <option value="ethereum">
+          <option
+            value="ethereum"
+            style={{
+              backgroundColor: isDark ? "#1e293b" : "#ffffff",
+              color: isDark ? "#f8fafc" : "#111827",
+            }}
+          >
             Ethereum
           </option>
 
-          <option value="solana">
+          <option
+            value="solana"
+            style={{
+              backgroundColor: isDark ? "#1e293b" : "#ffffff",
+              color: isDark ? "#f8fafc" : "#111827",
+            }}
+          >
             Solana
           </option>
 
@@ -1724,6 +1748,7 @@ function Analytics() {
                 </label>
                 <select
                   id="historical-date-select"
+                  className="analytics-select analytics-date-select"
                   value={selectedHistoricalDate}
                   onChange={(e) => setSelectedHistoricalDate(e.target.value)}
                   style={{
@@ -1731,6 +1756,7 @@ function Analytics() {
                     width: "auto",
                     minWidth: "160px",
                     padding: "7px 12px",
+                    colorScheme: isDark ? "dark" : "light",
                     backgroundColor: colors.input,
                     color: colors.text,
                     border: `1px solid ${colors.border}`,
@@ -1738,7 +1764,15 @@ function Analytics() {
                     outline: "none",
                   }}
                 >
-                  <option value="all">All Dates ({availableDates.length})</option>
+                  <option
+                    value="all"
+                    style={{
+                      backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                      color: isDark ? "#f8fafc" : "#111827",
+                    }}
+                  >
+                    All Dates ({availableDates.length})
+                  </option>
                   {availableDates.map((dateStr) => {
                     let formatted = dateStr;
                     try {
@@ -1749,7 +1783,14 @@ function Analytics() {
                       });
                     } catch {}
                     return (
-                      <option key={dateStr} value={dateStr}>
+                      <option
+                        key={dateStr}
+                        value={dateStr}
+                        style={{
+                          backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                          color: isDark ? "#f8fafc" : "#111827",
+                        }}
+                      >
                         {formatted}
                       </option>
                     );
@@ -1863,6 +1904,30 @@ function Analytics() {
 
       <style>
         {`
+          .analytics-select,
+          .analytics-date-select {
+            color-scheme: light;
+          }
+
+          html[data-theme="dark"] .analytics-select,
+          html[data-theme="dark"] .analytics-date-select {
+            color-scheme: dark;
+          }
+
+          .analytics-select option,
+          .analytics-date-select option {
+            color-scheme: light;
+            background-color: #ffffff;
+            color: #111827;
+          }
+
+          html[data-theme="dark"] .analytics-select option,
+          html[data-theme="dark"] .analytics-date-select option {
+            color-scheme: dark;
+            background-color: #1e293b;
+            color: #f8fafc;
+          }
+
           @media (max-width: 800px) {
             .analytics-container {
               padding: 20px 16px 36px !important;
