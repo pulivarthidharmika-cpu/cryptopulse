@@ -34,7 +34,7 @@ function Layout() {
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} className="layout-container">
 
       {/* Mobile Backdrop */}
       {sidebarOpen && (
@@ -380,6 +380,27 @@ function Layout() {
 
       <style>
         {`
+          [data-theme="dark"] .layout-container {
+            background: #020617 !important;
+          }
+
+          [data-theme="dark"] .layout-header {
+            background: rgba(15, 23, 42, 0.95) !important;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15) !important;
+          }
+
+          [data-theme="dark"] .layout-header-title {
+            color: #f8fafc !important;
+          }
+
+          [data-theme="dark"] .layout-header-subtext {
+            color: #94a3b8 !important;
+          }
+
+          [data-theme="dark"] .layout-menu-button {
+            color: #f8fafc !important;
+          }
+
           .layout-menu-button {
             display: none;
             background: transparent;
@@ -494,7 +515,7 @@ const styles = {
     display: "flex",
 
     background:
-      "linear-gradient(135deg, #eff6ff, #dbeafe)",
+      "var(--layout-bg, linear-gradient(135deg, #eff6ff, #dbeafe))",
 
     fontFamily:
       "Inter, Arial, Helvetica, sans-serif",
@@ -769,10 +790,10 @@ const styles = {
     alignItems: "center",
 
     background:
-      "rgba(255,255,255,0.75)",
+      "var(--header-bg, rgba(255,255,255,0.75))",
 
     borderBottom:
-      "1px solid rgba(59,130,246,0.12)",
+      "1px solid var(--header-border, rgba(59,130,246,0.12))",
 
     backdropFilter:
       "blur(12px)",
@@ -785,7 +806,7 @@ const styles = {
 
     fontWeight: "700",
 
-    color: "#172554",
+    color: "var(--header-title, #172554)",
   },
 
   headerSubtext: {
@@ -795,7 +816,7 @@ const styles = {
 
     fontSize: "12px",
 
-    color: "#64748b",
+    color: "var(--header-subtext, #64748b)",
   },
 
   headerStatus: {
@@ -818,8 +839,14 @@ const styles = {
   /* -------------------------------------------------- */
 
   content: {
+    flex: 1,
+
     minHeight:
       "calc(100vh - 75px)",
+
+    display: "flex",
+
+    flexDirection: "column",
   },
 
 

@@ -1220,10 +1220,20 @@ function Settings() {
           [data-theme="dark"] .profile-card,
           [data-theme="dark"] .security-item,
           [data-theme="dark"] .preference-item,
-          [data-theme="dark"] .quick-action-btn {
+          [data-theme="dark"] .quick-action-btn,
+          [data-theme="dark"] .account-option {
             background: #1e293b;
             border-color: #334155;
             color: #f8fafc;
+          }
+
+          [data-theme="dark"] .account-option strong {
+            color: #f8fafc;
+          }
+
+          [data-theme="dark"] .account-option:hover {
+            background: #27354a;
+            border-color: #475569;
           }
 
           [data-theme="dark"] .info-item span {
@@ -1279,10 +1289,20 @@ function Settings() {
             [data-theme="system"] .profile-card,
             [data-theme="system"] .security-item,
             [data-theme="system"] .preference-item,
-            [data-theme="system"] .quick-action-btn {
+            [data-theme="system"] .quick-action-btn,
+            [data-theme="system"] .account-option {
               background: #1e293b;
               border-color: #334155;
               color: #f8fafc;
+            }
+
+            [data-theme="system"] .account-option strong {
+              color: #f8fafc;
+            }
+
+            [data-theme="system"] .account-option:hover {
+              background: #27354a;
+              border-color: #475569;
             }
 
             [data-theme="system"] .info-item span {
