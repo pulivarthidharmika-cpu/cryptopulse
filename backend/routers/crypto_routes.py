@@ -3,7 +3,8 @@ from models.crypto_model import CryptoPrice, Alert
 from database.database import (
     live_prices_collection,
     historical_prices_collection,
-    alerts_collection
+    alerts_collection,
+    coins_collection
 )
 from utils.logger import logger
 from config.settings import SUPPORTED_COINS, BITCOIN_ALERT_PRICE
@@ -26,6 +27,13 @@ async def health_check():
 @router.get("/coins")
 async def get_coins():
     logger.info("Coins endpoint called")
+    try:
+        db_coins = await coins_collection.find({"active": True}, {"_id": 0, "coin": 1}).to_list(length=100)
+        if db_coins:
+            coins = list(dict.fromkeys([c["coin"] for c in db_coins if c.get("coin")]))
+            return {"coins": coins}
+    except Exception:
+        pass
     return {
         "coins": SUPPORTED_COINS
     }

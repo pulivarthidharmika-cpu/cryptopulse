@@ -73,6 +73,11 @@ function Analytics() {
   const [timeframeLimit, setTimeframeLimit] = useState(60);
 
   const [selectedCoin, setSelectedCoin] = useState("bitcoin");
+  const [availableCoins, setAvailableCoins] = useState([
+    { coin: "bitcoin", name: "Bitcoin" },
+    { coin: "ethereum", name: "Ethereum" },
+    { coin: "solana", name: "Solana" },
+  ]);
   const [selectedHistoricalDate, setSelectedHistoricalDate] = useState("all");
   const [isStreaming, setIsStreaming] = useState(true);
   const [pollInterval, setPollInterval] = useState(5000);
@@ -81,6 +86,47 @@ function Analytics() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  /* ============================================================
+     FETCH AVAILABLE COINS
+  ============================================================ */
+
+  useEffect(() => {
+    const fetchAvailableCoins = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/coins`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.coins) && data.coins.length > 0) {
+            const list = data.coins.map((c) => {
+              if (typeof c === "string") {
+                return {
+                  coin: c.toLowerCase(),
+                  name: c.charAt(0).toUpperCase() + c.slice(1),
+                };
+              }
+              return {
+                coin: c.coin.toLowerCase(),
+                name: c.name || (c.coin.charAt(0).toUpperCase() + c.coin.slice(1)),
+              };
+            });
+            const unique = [];
+            const seen = new Set();
+            for (const item of list) {
+              if (!seen.has(item.coin)) {
+                seen.add(item.coin);
+                unique.push(item);
+              }
+            }
+            setAvailableCoins(unique);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load available coins:", err);
+      }
+    };
+    fetchAvailableCoins();
+  }, []);
 
   /* ----------------------------------------------------------
      THEME
@@ -816,36 +862,18 @@ function Analytics() {
           }}
         >
 
-          <option
-            value="bitcoin"
-            style={{
-              backgroundColor: isDark ? "#1e293b" : "#ffffff",
-              color: isDark ? "#f8fafc" : "#111827",
-            }}
-          >
-            Bitcoin
-          </option>
-
-          <option
-            value="ethereum"
-            style={{
-              backgroundColor: isDark ? "#1e293b" : "#ffffff",
-              color: isDark ? "#f8fafc" : "#111827",
-            }}
-          >
-            Ethereum
-          </option>
-
-          <option
-            value="solana"
-            style={{
-              backgroundColor: isDark ? "#1e293b" : "#ffffff",
-              color: isDark ? "#f8fafc" : "#111827",
-            }}
-          >
-            Solana
-          </option>
-
+          {availableCoins.map((item) => (
+            <option
+              key={item.coin}
+              value={item.coin}
+              style={{
+                backgroundColor: isDark ? "#1e293b" : "#ffffff",
+                color: isDark ? "#f8fafc" : "#111827",
+              }}
+            >
+              {item.name}
+            </option>
+          ))}
         </select>
 
       </div>

@@ -1,4 +1,4 @@
-# Import BaseModel for creating models
+from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -24,5 +24,7 @@ class CryptoPrice(BaseModel):
 # --------------------------------------------------
 class CoinModel(BaseModel):
 
-    # Cryptocurrency name
-    coin: str
+    # Cryptocurrency identifier or name
+    coin: Optional[str] = None
+    name: Optional[str] = None
+    symbol: Optional[str] = None

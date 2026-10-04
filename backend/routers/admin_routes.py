@@ -172,11 +172,27 @@ async def update_user_role(
 # CRYPTOCURRENCY MANAGEMENT
 # ==================================================
 
+STANDARD_COIN_META = {
+    "bitcoin": {"name": "Bitcoin", "symbol": "BTC"},
+    "ethereum": {"name": "Ethereum", "symbol": "ETH"},
+    "solana": {"name": "Solana", "symbol": "SOL"},
+}
+
+CANONICAL_COIN_ALIASES = {
+    "btc": "bitcoin",
+    "bitcoin": "bitcoin",
+    "eth": "ethereum",
+    "ethereum": "ethereum",
+    "sol": "solana",
+    "solana": "solana",
+}
+
 
 # --------------------------------------------------
 # Add New Cryptocurrency
 # Only Admin users can add new coins
 # --------------------------------------------------
+@router.post("/coins")
 @router.post("/add-coin")
 async def add_coin(
     coin_data: CoinModel,
@@ -184,36 +200,79 @@ async def add_coin(
 ):
 
     try:
+        raw_name = (coin_data.name or coin_data.coin or "").strip()
+        raw_symbol = (coin_data.symbol or "").strip()
 
-        coin = coin_data.coin.lower()
-
-        existing_coin = await coins_collection.find_one(
-            {"coin": coin}
-        )
-
-        if existing_coin:
-
+        if not raw_name and not raw_symbol:
             raise HTTPException(
                 status_code=400,
-                detail=f"{coin} already exists"
+                detail="Coin Name and Symbol are required"
+            )
+
+        name = raw_name if raw_name else raw_symbol.capitalize()
+        symbol = raw_symbol.upper() if raw_symbol else raw_name[:4].upper()
+
+        if len(name) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Coin name must be at least 2 characters"
+            )
+
+        if len(symbol) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Coin symbol must be at least 2 characters"
+            )
+
+        clean_slug = name.lower().replace(" ", "-")
+        canonical_key = CANONICAL_COIN_ALIASES.get(
+            clean_slug,
+            CANONICAL_COIN_ALIASES.get(symbol.lower(), clean_slug)
+        )
+
+        # Check existing coin (case-insensitive across key, symbol, and name)
+        existing_coin = await coins_collection.find_one({
+            "$or": [
+                {"coin": {"$regex": f"^{re.escape(canonical_key)}$", "$options": "i"}},
+                {"coin": {"$regex": f"^{re.escape(clean_slug)}$", "$options": "i"}},
+                {"symbol": {"$regex": f"^{re.escape(symbol)}$", "$options": "i"}},
+                {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+            ]
+        })
+
+        if existing_coin:
+            exist_key = existing_coin.get("coin", "").lower()
+            std_meta = STANDARD_COIN_META.get(exist_key, {})
+            exist_name = existing_coin.get("name") or std_meta.get("name") or exist_key.capitalize()
+            exist_sym = existing_coin.get("symbol") or std_meta.get("symbol") or exist_key[:4].upper()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cryptocurrency '{exist_name}' ({exist_sym}) already exists"
             )
 
         coin_document = {
-            "coin": coin,
+            "coin": canonical_key,
+            "name": name,
+            "symbol": symbol,
             "active": True
         }
 
-        await coins_collection.insert_one(
-            coin_document
-        )
+        await coins_collection.insert_one(coin_document)
 
         logger.info(
-            f"{coin} added by admin {current_user['email']}"
+            f"Coin '{name}' ({symbol}) added by admin {current_user['email']}"
         )
 
         return {
             "status": "success",
-            "message": f"{coin} added successfully",
+            "message": f"Cryptocurrency '{name}' ({symbol}) added successfully",
+            "coin": {
+                "coin": canonical_key,
+                "name": name,
+                "symbol": symbol,
+                "active": True,
+                "status": "Active"
+            },
             "added_by": current_user["email"]
         }
 
@@ -221,11 +280,9 @@ async def add_coin(
         raise
 
     except Exception as e:
-
         logger.error(
             f"Coin creation failed: {str(e)}"
         )
-
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -242,27 +299,39 @@ async def get_coins(
 ):
 
     try:
-
         coins = await coins_collection.find(
             {},
             {"_id": 0}
-        ).to_list(length=100)
+        ).to_list(length=200)
+
+        formatted_coins = []
+        for c in coins:
+            coin_key = c.get("coin", "").strip().lower()
+            meta = STANDARD_COIN_META.get(coin_key, {})
+            name = c.get("name") or meta.get("name") or coin_key.capitalize()
+            symbol = c.get("symbol") or meta.get("symbol") or coin_key[:4].upper()
+            active = c.get("active", True)
+            formatted_coins.append({
+                "coin": coin_key,
+                "name": name,
+                "symbol": symbol,
+                "active": active,
+                "status": "Active" if active else "Inactive"
+            })
 
         logger.info(
             f"Coins fetched by {current_user['email']}"
         )
 
         return {
-            "count": len(coins),
-            "coins": coins
+            "count": len(formatted_coins),
+            "coins": formatted_coins
         }
 
     except Exception as e:
-
         logger.error(
             f"Fetching coins failed: {str(e)}"
         )
-
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -281,20 +350,23 @@ async def update_coin(
 ):
 
     try:
+        clean_coin = coin.strip().lower()
+        new_coin = (coin_data.name or coin_data.coin or "").strip().lower()
 
         result = await coins_collection.update_one(
             {
-                "coin": coin.lower()
+                "coin": clean_coin
             },
             {
                 "$set": {
-                    "coin": coin_data.coin.lower()
+                    "coin": new_coin or clean_coin,
+                    "name": coin_data.name or new_coin.capitalize(),
+                    "symbol": (coin_data.symbol or "").upper()
                 }
             }
         )
 
         if result.matched_count == 0:
-
             raise HTTPException(
                 status_code=404,
                 detail="Coin not found"
@@ -313,11 +385,9 @@ async def update_coin(
         raise
 
     except Exception as e:
-
         logger.error(
             f"Coin update failed: {str(e)}"
         )
-
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -328,6 +398,7 @@ async def update_coin(
 # Delete Coin
 # Only Admin can delete a coin
 # --------------------------------------------------
+@router.delete("/coins/{coin}")
 @router.delete("/delete-coin/{coin}")
 async def delete_coin(
     coin: str,
@@ -335,15 +406,24 @@ async def delete_coin(
 ):
 
     try:
+        clean_coin = coin.strip().lower()
+        core_coins = ("bitcoin", "ethereum", "solana", "btc", "eth", "sol")
 
-        result = await coins_collection.delete_one(
-            {
-                "coin": coin.lower()
-            }
-        )
+        if clean_coin in core_coins:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Core cryptocurrency '{coin}' cannot be deleted"
+            )
+
+        result = await coins_collection.delete_one({
+            "$or": [
+                {"coin": {"$regex": f"^{re.escape(clean_coin)}$", "$options": "i"}},
+                {"symbol": {"$regex": f"^{re.escape(coin.strip())}$", "$options": "i"}},
+                {"name": {"$regex": f"^{re.escape(coin.strip())}$", "$options": "i"}}
+            ]
+        })
 
         if result.deleted_count == 0:
-
             raise HTTPException(
                 status_code=404,
                 detail="Coin not found"
@@ -355,7 +435,7 @@ async def delete_coin(
 
         return {
             "status": "success",
-            "message": f"{coin} deleted successfully",
+            "message": f"Cryptocurrency '{coin}' deleted successfully",
             "deleted_by": current_user["email"]
         }
 
@@ -363,11 +443,9 @@ async def delete_coin(
         raise
 
     except Exception as e:
-
         logger.error(
             f"Coin deletion failed: {str(e)}"
         )
-
         raise HTTPException(
             status_code=500,
             detail=str(e)

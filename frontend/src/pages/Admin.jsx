@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/admin.css";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 function Admin() {
   const navigate = useNavigate();
@@ -12,6 +12,145 @@ function Admin() {
   const [updatingEmail, setUpdatingEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  // ==================================================
+  // COIN MANAGEMENT STATE
+  // ==================================================
+
+  const [coins, setCoins] = useState([]);
+  const [loadingCoins, setLoadingCoins] = useState(true);
+  const [showAddCoin, setShowAddCoin] = useState(false);
+  const [newCoinName, setNewCoinName] = useState("");
+  const [newCoinSymbol, setNewCoinSymbol] = useState("");
+  const [submittingCoin, setSubmittingCoin] = useState(false);
+  const [deletingCoin, setDeletingCoin] = useState("");
+  const [coinError, setCoinError] = useState("");
+  const [coinSuccess, setCoinSuccess] = useState("");
+
+  // ==================================================
+  // FETCH COINS
+  // ==================================================
+
+  const fetchCoins = async () => {
+    try {
+      setLoadingCoins(true);
+      setCoinError("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${BASE_URL}/admin/coins`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to fetch coins");
+      }
+
+      setCoins(data.coins || []);
+    } catch (err) {
+      console.error("Fetch coins error:", err);
+      setCoinError(err.message || "Unable to load coins.");
+    } finally {
+      setLoadingCoins(false);
+    }
+  };
+
+  // ==================================================
+  // ADD COIN
+  // ==================================================
+
+  const handleAddCoin = async (e) => {
+    e.preventDefault();
+
+    const name = newCoinName.trim();
+    const symbol = newCoinSymbol.trim().toUpperCase();
+
+    if (!name || !symbol) {
+      setCoinError("Both Coin Name and Symbol are required.");
+      return;
+    }
+
+    try {
+      setSubmittingCoin(true);
+      setCoinError("");
+      setCoinSuccess("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${BASE_URL}/admin/coins`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name,
+          symbol,
+          coin: name.toLowerCase().replace(/\s+/g, "-"),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to add coin");
+      }
+
+      setCoinSuccess(`Cryptocurrency '${name}' (${symbol}) added successfully.`);
+      setNewCoinName("");
+      setNewCoinSymbol("");
+
+      // Refresh coins list
+      await fetchCoins();
+    } catch (err) {
+      console.error("Add coin error:", err);
+      setCoinError(err.message || "Unable to add coin.");
+    } finally {
+      setSubmittingCoin(false);
+    }
+  };
+
+  // ==================================================
+  // DELETE COIN
+  // ==================================================
+
+  const handleDeleteCoin = async (coinKey) => {
+    try {
+      setDeletingCoin(coinKey);
+      setCoinError("");
+      setCoinSuccess("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${BASE_URL}/admin/coins/${encodeURIComponent(coinKey)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to delete coin");
+      }
+
+      setCoinSuccess(data.message || `Cryptocurrency '${coinKey}' removed.`);
+      await fetchCoins();
+    } catch (err) {
+      console.error("Delete coin error:", err);
+      setCoinError(err.message || "Unable to delete coin.");
+    } finally {
+      setDeletingCoin("");
+    }
+  };
 
   // ==================================================
   // FETCH USERS
@@ -61,6 +200,7 @@ function Admin() {
 
   useEffect(() => {
     fetchUsers();
+    fetchCoins();
   }, []);
 
   // ==================================================
@@ -474,6 +614,182 @@ function Admin() {
 
             </div>
 
+          )}
+
+        </section>
+
+
+        {/* =========================================== */}
+        {/* COIN MANAGEMENT CARD */}
+        {/* =========================================== */}
+
+        <section className="coins-card users-card" style={{ marginTop: "32px" }}>
+
+          <div className="users-card-header">
+
+            <div>
+
+              <h3>
+                Coin Management
+              </h3>
+
+              <p>
+                Configure cryptocurrencies supported by CryptoPulse.
+              </p>
+
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+
+              <button
+                className="refresh-button"
+                onClick={fetchCoins}
+                disabled={loadingCoins}
+              >
+                ↻ Refresh
+              </button>
+
+              <button
+                className="add-coin-toggle-btn"
+                onClick={() => {
+                  setShowAddCoin((prev) => !prev);
+                  setCoinError("");
+                  setCoinSuccess("");
+                }}
+              >
+                {showAddCoin ? "✕ Close" : "+ Add Coin"}
+              </button>
+
+            </div>
+
+          </div>
+
+          {/* ADD COIN DRAWER / FORM */}
+          {showAddCoin && (
+            <div className="add-coin-container">
+
+              <form onSubmit={handleAddCoin} className="add-coin-form">
+
+                <div className="add-coin-field">
+                  <label htmlFor="admin-coin-name">Coin Name</label>
+                  <input
+                    id="admin-coin-name"
+                    type="text"
+                    placeholder="e.g. Cardano"
+                    value={newCoinName}
+                    onChange={(e) => setNewCoinName(e.target.value)}
+                    className="add-coin-input"
+                    required
+                  />
+                </div>
+
+                <div className="add-coin-field">
+                  <label htmlFor="admin-coin-symbol">Symbol</label>
+                  <input
+                    id="admin-coin-symbol"
+                    type="text"
+                    placeholder="e.g. ADA"
+                    value={newCoinSymbol}
+                    onChange={(e) => setNewCoinSymbol(e.target.value.toUpperCase())}
+                    className="add-coin-input"
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="add-coin-submit-btn"
+                  disabled={submittingCoin}
+                >
+                  {submittingCoin ? "Adding..." : "Add Coin"}
+                </button>
+
+              </form>
+
+              {coinError && (
+                <div className="admin-message error-message" style={{ margin: "14px 0 0" }}>
+                  ⚠ {coinError}
+                </div>
+              )}
+
+              {coinSuccess && (
+                <div className="admin-message success-message" style={{ margin: "14px 0 0" }}>
+                  ✓ {coinSuccess}
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* COINS TABLE */}
+          {loadingCoins ? (
+            <div className="admin-loading">
+              <div className="loader"></div>
+              <p>Loading cryptocurrencies...</p>
+            </div>
+          ) : coins.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">🪙</div>
+              <h3>No coins configured</h3>
+              <p>Add cryptocurrencies using the button above.</p>
+            </div>
+          ) : (
+            <div className="users-table-wrapper">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Cryptocurrency</th>
+                    <th>Symbol</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coins.map((c, index) => {
+                    const isCore = ["bitcoin", "ethereum", "solana"].includes(c.coin.toLowerCase());
+                    return (
+                      <tr key={c.coin}>
+                        <td className="user-number">{index + 1}</td>
+                        <td>
+                          <div className="email-cell">
+                            <div className="coin-avatar">
+                              {c.symbol ? c.symbol.slice(0, 3) : c.coin.charAt(0).toUpperCase()}
+                            </div>
+                            <span style={{ fontWeight: "600" }}>
+                              {c.name || c.coin.charAt(0).toUpperCase() + c.coin.slice(1)}
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="coin-symbol-badge">
+                            {c.symbol || c.coin.slice(0, 4).toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="active-status">● {c.status || "Active"}</span>
+                        </td>
+                        <td>
+                          {isCore ? (
+                            <span className="core-badge" title="Core supported cryptocurrency">
+                              System Core
+                            </span>
+                          ) : (
+                            <button
+                              className="delete-coin-btn"
+                              onClick={() => handleDeleteCoin(c.coin)}
+                              disabled={deletingCoin === c.coin}
+                            >
+                              {deletingCoin === c.coin ? "Removing..." : "Remove"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
 
         </section>
