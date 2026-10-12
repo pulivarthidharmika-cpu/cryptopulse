@@ -809,7 +809,7 @@ function Dashboard() {
 
 {/* ================= TOP GAINERS / TOP LOSERS ================= */}
 
-<div className="market-movers">
+<div className="market-movers" style={{ marginTop: "36px" }}>
 
   {/* TOP GAINERS */}
 
@@ -1518,6 +1518,7 @@ function Dashboard() {
                 minmax(320px, 1fr)
               );
             gap: 25px;
+            margin-bottom: 36px;
           }
 
           .coin-card {
@@ -1833,6 +1834,7 @@ function Dashboard() {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
             gap: 22px;
+            margin-top: 36px;
             margin-bottom: 35px;
           }
 

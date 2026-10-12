@@ -102,28 +102,15 @@ async def alert_websocket(websocket: WebSocket):
 
 # --------------------------------------------------
 # Get All Alerts
-# Returns alerts created by the user (or all if admin)
+# Returns alerts for all authenticated roles (admin, analyst, user)
 # --------------------------------------------------
 @router.get("/")
 async def get_alerts(
     current_user: dict = Depends(get_current_user)
 ):
     try:
-        import re
         alerts = []
-        user_email = current_user.get("email", "").strip().lower()
-
-        if current_user.get("role") == "admin":
-            query = {}
-        else:
-            query = {
-                "$or": [
-                    {"user_email": {"$regex": f"^{re.escape(user_email)}$", "$options": "i"}},
-                    {"user_id": {"$regex": f"^{re.escape(user_email)}$", "$options": "i"}}
-                ]
-            }
-
-        cursor = alerts_collection.find(query).sort("_id", -1)
+        cursor = alerts_collection.find({}).sort("_id", -1)
 
         async for document in cursor:
             document["_id"] = str(document["_id"])
@@ -134,7 +121,7 @@ async def get_alerts(
             alerts.append(document)
 
         logger.info(
-            f"Alerts fetched successfully for {current_user['email']} (count: {len(alerts)})"
+            f"Alerts fetched successfully for {current_user['email']} (role: {current_user.get('role')}, count: {len(alerts)})"
         )
 
         return {
@@ -280,48 +267,35 @@ async def update_alert(
 
         }
 
-        # Update only if alert belongs to current user
+        # Update alert
         result = await alerts_collection.update_one(
-
-            {
-                "_id": ObjectId(alert_id),
-                "user_email": current_user["email"]
-            },
-
-            {
-                "$set": updated_data
-            }
-
+            {"_id": ObjectId(alert_id)},
+            {"$set": updated_data}
         )
 
         if result.matched_count == 0:
-
             raise HTTPException(
                 status_code=404,
                 detail="Alert not found"
             )
 
         logger.info(
-            f"Alert updated by {current_user['email']}"
+            f"Alert updated by {current_user['email']} (role: {current_user.get('role')})"
         )
 
         return {
-
             "status": "success",
             "message": "Alert updated successfully",
             "data": updated_data
-
         }
 
     except HTTPException:
         raise
 
     except Exception as e:
-
         logger.error(
             f"Alert update failed: {str(e)}"
         )
-
         raise HTTPException(
             status_code=500,
             detail=str(e)
@@ -330,7 +304,7 @@ async def update_alert(
 
 # --------------------------------------------------
 # Delete Alert
-# User can delete only their own alerts
+# Allow admin, analyst, and users to manage alerts
 # --------------------------------------------------
 @router.delete("/{alert_id}")
 async def delete_alert(
@@ -338,38 +312,28 @@ async def delete_alert(
     current_user: dict = Depends(get_current_user)
 ):
     try:
-
         # Validate MongoDB ObjectId
         if not ObjectId.is_valid(alert_id):
-
             raise HTTPException(
                 status_code=400,
                 detail="Invalid alert ID"
             )
 
-        # Delete alert (allow admin to delete, or owner)
-        filter_q = {"_id": ObjectId(alert_id)}
-        if current_user.get("role") != "admin":
-            filter_q["user_email"] = current_user["email"]
-
-        result = await alerts_collection.delete_one(filter_q)
+        result = await alerts_collection.delete_one({"_id": ObjectId(alert_id)})
 
         if result.deleted_count == 0:
-
             raise HTTPException(
                 status_code=404,
                 detail="Alert not found"
             )
 
         logger.info(
-            f"Alert deleted by {current_user['email']}"
+            f"Alert deleted by {current_user['email']} (role: {current_user.get('role')})"
         )
 
         return {
-
             "status": "success",
             "message": "Alert deleted successfully"
-
         }
 
     except HTTPException:
