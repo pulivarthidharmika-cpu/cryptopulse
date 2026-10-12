@@ -81,9 +81,28 @@ class TestComparisonRoutes(AsyncBaseTestCase):
         self.assertEqual(len(data["metrics"]), 3)
         if len(data["normalized_series"]) > 0:
             first = data["normalized_series"][0]
-            self.assertIn("time", first)
             # Ensure time is clean HH:MM:SS format rather than raw microsecond decimals
             self.assertRegex(first["time"], r"^\d{2}:\d{2}:\d{2}$")
+
+    def test_comparison_extended_and_max_limits(self):
+        """Verify comparison succeeds for extended (300) and max (1000) limits without offset-naive/aware error."""
+        # Test 300 pts (Extended)
+        resp300 = self.run_async(
+            self.client.get("/analytics/comparison?coins=bitcoin,ethereum,binance&limit=300")
+        )
+        self.assertEqual(resp300.status_code, 200)
+        data300 = resp300.json()
+        self.assertEqual(data300["status"], "success")
+        self.assertEqual(data300["timeframe_limit"], 300)
+
+        # Test 1000 pts (Max)
+        resp1000 = self.run_async(
+            self.client.get("/analytics/comparison?coins=bitcoin,ethereum,binance&limit=1000")
+        )
+        self.assertEqual(resp1000.status_code, 200)
+        data1000 = resp1000.json()
+        self.assertEqual(data1000["status"], "success")
+        self.assertEqual(data1000["timeframe_limit"], 1000)
 
 
 if __name__ == "__main__":

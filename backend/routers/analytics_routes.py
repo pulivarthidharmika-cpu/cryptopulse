@@ -18,7 +18,7 @@ from config.settings import SUPPORTED_COINS
 
 # Python standard libraries
 import statistics
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 async def get_active_coin_slugs() -> list[str]:
@@ -1128,34 +1128,50 @@ async def get_comparative_analytics(limit: int = 60, coins: Optional[str] = None
 
 
 def normalize_timestamp_val(val) -> tuple[datetime, str]:
-    """Helper to convert datetime or string timestamp to (datetime_obj, canonical_iso_str)."""
+    """Helper to convert datetime or string timestamp to (naive_utc_datetime, canonical_iso_str)."""
+    dt = None
     if isinstance(val, datetime):
-        return val, val.isoformat()
-    if isinstance(val, str):
-        cleaned = val.strip().replace("Z", "")
+        dt = val
+    elif isinstance(val, str):
+        cleaned = val.strip()
+        if cleaned.endswith("Z"):
+            cleaned = cleaned[:-1] + "+00:00"
         try:
-            return datetime.fromisoformat(cleaned), cleaned
+            dt = datetime.fromisoformat(cleaned)
         except Exception:
             pass
-        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+        if dt is None:
+            for fmt in (
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M:%S",
+            ):
+                try:
+                    dt = datetime.strptime(cleaned, fmt)
+                    break
+                except Exception:
+                    pass
+        if dt is None:
             try:
-                dt = datetime.strptime(cleaned, fmt)
-                return dt, dt.isoformat()
+                dt = datetime.utcfromtimestamp(float(cleaned))
             except Exception:
                 pass
-        try:
-            dt = datetime.utcfromtimestamp(float(cleaned))
-            return dt, dt.isoformat()
-        except Exception:
-            pass
     elif isinstance(val, (int, float)):
         try:
             dt = datetime.utcfromtimestamp(float(val))
-            return dt, dt.isoformat()
         except Exception:
             pass
-    now = datetime.utcnow()
-    return now, now.isoformat()
+
+    if dt is None:
+        dt = datetime.utcnow()
+
+    # Always ensure offset-naive UTC datetime so mixed records never trigger:
+    # "can't compare offset-naive and offset-aware datetimes"
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return dt, dt.isoformat()
 
 
 # ==================================================
@@ -1174,6 +1190,7 @@ async def get_comparison_data(
     - Requires 2 to 5 coins (comma-separated slugs).
     - Returns real-time metrics (current price, 24h change, 24h volume, market cap)
       and historical normalized % change series aligned on shared time period.
+      Supports up to 1000 historical comparison points.
     - Gracefully handles missing metrics as None/Unavailable.
     """
     try:
@@ -1191,7 +1208,7 @@ async def get_comparison_data(
                 detail="A maximum of 5 cryptocurrencies can be compared simultaneously."
             )
 
-        limit = max(10, min(limit, 200))
+        limit = max(10, min(limit, 1000))
         meta_map = await get_active_coin_details()
 
         # Fetch latest live market data for each selected coin
