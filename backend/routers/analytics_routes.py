@@ -507,14 +507,15 @@ async def get_ohlc(
             interval = "1m"
 
         # ------------------------------------------
-        # Validate coin
+        # Validate coin (allow static supported and dynamic active coins)
         # ------------------------------------------
-        if coin not in SUPPORTED_COINS:
+        active_slugs = await get_active_coin_slugs()
+        if coin not in SUPPORTED_COINS and coin not in active_slugs:
             raise HTTPException(
                 status_code=400,
                 detail=(
                     f"Unsupported coin '{coin}'. "
-                    f"Supported coins: {', '.join(SUPPORTED_COINS)}"
+                    f"Supported coins: {', '.join(set(SUPPORTED_COINS + active_slugs))}"
                 )
             )
 
@@ -526,7 +527,7 @@ async def get_ohlc(
         cursor = historical_prices_collection.find(
             {"coin": coin},
             {"_id": 0, "coin": 1, "price": 1, "timestamp": 1}
-        ).sort("timestamp", 1)
+        )
 
         records = []
         async for document in cursor:
@@ -538,21 +539,15 @@ async def get_ohlc(
 
             try:
                 price = float(price)
-
-                if isinstance(timestamp, datetime):
-                    dt = timestamp
-                else:
-                    timestamp_text = str(timestamp)
-                    if timestamp_text.endswith("Z"):
-                        timestamp_text = timestamp_text[:-1] + "+00:00"
-                    dt = datetime.fromisoformat(timestamp_text)
-
+                dt, _ = normalize_timestamp_val(timestamp)
                 records.append({
                     "datetime": dt,
                     "price": price
                 })
             except Exception:
                 pass
+
+        records.sort(key=lambda r: r["datetime"])
 
         if not records:
             return {

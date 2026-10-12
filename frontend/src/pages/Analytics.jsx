@@ -17,6 +17,7 @@ import {
 import {
   Chart as ChartJS,
   TimeScale,
+  TimeSeriesScale,
   LinearScale,
   Tooltip as ChartJSTooltip,
   Legend,
@@ -40,6 +41,7 @@ import { Chart } from "react-chartjs-2";
 
 ChartJS.register(
   TimeScale,
+  TimeSeriesScale,
   LinearScale,
   ChartJSTooltip,
   Legend,
@@ -67,6 +69,7 @@ function Analytics() {
   const [ohlc, setOhlc] = useState([]);
   const [ohlcInterval, setOhlcInterval] = useState("1m");
   const [ohlcSummary, setOhlcSummary] = useState(null);
+  const [candleViewCount, setCandleViewCount] = useState(60);
   const [volumeData, setVolumeData] = useState(null);
   const [comparativeData, setComparativeData] = useState(null);
   const [chartMode, setChartMode] = useState("single");
@@ -509,23 +512,60 @@ function Analytics() {
      CANDLESTICK DATA
   ============================================================ */
 
-  const candlestickData = ohlc
-    .filter(
-      (item) =>
-        item &&
-        item.timestamp &&
-        item.open !== undefined &&
-        item.high !== undefined &&
-        item.low !== undefined &&
-        item.close !== undefined
-    )
-    .map((item) => ({
-      x: Number(item.timestamp),
-      o: Number(item.open),
-      h: Number(item.high),
-      l: Number(item.low),
-      c: Number(item.close),
-    }));
+  const candlestickData = useMemo(() => {
+    if (!Array.isArray(ohlc)) return [];
+    const valid = ohlc
+      .filter(
+        (item) =>
+          item &&
+          item.timestamp &&
+          item.open !== undefined &&
+          item.high !== undefined &&
+          item.low !== undefined &&
+          item.close !== undefined
+      )
+      .map((item) => ({
+        x: Number(item.timestamp),
+        o: Number(item.open),
+        h: Number(item.high),
+        l: Number(item.low),
+        c: Number(item.close),
+      }));
+
+    if (candleViewCount === "all" || typeof candleViewCount !== "number") {
+      return valid;
+    }
+    return valid.slice(-candleViewCount);
+  }, [ohlc, candleViewCount]);
+
+  const visibleSummary = useMemo(() => {
+    if (!candlestickData || candlestickData.length === 0) {
+      return ohlcSummary;
+    }
+    let bullish = 0;
+    let bearish = 0;
+    let high = -Infinity;
+    let low = Infinity;
+    let bodySum = 0;
+
+    for (const c of candlestickData) {
+      if (c.c >= c.o) bullish++;
+      else bearish++;
+      if (c.h > high) high = c.h;
+      if (c.l < low) low = c.l;
+      bodySum += Math.abs(c.c - c.o);
+    }
+
+    return {
+      bullish_candles: bullish,
+      bearish_candles: bearish,
+      period_high: high !== -Infinity ? high : null,
+      period_low: low !== Infinity ? low : null,
+      avg_body_size: (bodySum / candlestickData.length).toFixed(2),
+    };
+  }, [candlestickData, ohlcSummary]);
+
+  const activeCandleSummary = visibleSummary || ohlcSummary;
 
 
   /* ============================================================
@@ -541,28 +581,41 @@ function Analytics() {
 
         /*
          * Candlestick chart colors.
-         * These are standard financial chart colors.
+         * chartjs-chart-financial requires borderColors & backgroundColors (plural).
          */
+        borderColors: {
+          up: "#10b981",
+          down: "#ef4444",
+          unchanged: "#94a3b8",
+        },
+
+        backgroundColors: {
+          up: "rgba(16, 185, 129, 0.75)",
+          down: "rgba(239, 68, 68, 0.75)",
+          unchanged: "rgba(148, 163, 184, 0.75)",
+        },
 
         color: {
-          up: "#16a34a",
-          down: "#dc2626",
-          unchanged: "#64748b",
+          up: "#10b981",
+          down: "#ef4444",
+          unchanged: "#94a3b8",
         },
 
         borderColor: {
-          up: "#16a34a",
-          down: "#dc2626",
-          unchanged: "#64748b",
+          up: "#10b981",
+          down: "#ef4444",
+          unchanged: "#94a3b8",
         },
 
         backgroundColor: {
-          up: "#16a34a",
-          down: "#dc2626",
-          unchanged: "#64748b",
+          up: "rgba(16, 185, 129, 0.75)",
+          down: "rgba(239, 68, 68, 0.75)",
+          unchanged: "rgba(148, 163, 184, 0.75)",
         },
 
-        borderWidth: 1,
+        borderWidth: 1.5,
+        categoryPercentage: 0.88,
+        barPercentage: 0.92,
       },
     ],
   };
@@ -595,19 +648,33 @@ function Analytics() {
         intersect: false,
 
         callbacks: {
+          title: function (context) {
+            if (!context || !context[0]) return "";
+            const raw = context[0].raw;
+            if (!raw || !raw.x) return "";
+            try {
+              return new Date(raw.x).toLocaleString();
+            } catch {
+              return "";
+            }
+          },
           label: function (context) {
-            const candle =
-              context.raw;
+            const candle = context.raw;
 
             if (!candle) {
               return "";
             }
 
+            const change = candle.c - candle.o;
+            const changePct =
+              candle.o > 0 ? ((change / candle.o) * 100).toFixed(2) : "0.00";
+            const sign = change >= 0 ? "+" : "";
+
             return [
-              `Open: $${formatPrice(candle.o)}`,
-              `High: $${formatPrice(candle.h)}`,
-              `Low: $${formatPrice(candle.l)}`,
-              `Close: $${formatPrice(candle.c)}`,
+              `Open:  $${formatPrice(candle.o)}`,
+              `High:  $${formatPrice(candle.h)}`,
+              `Low:   $${formatPrice(candle.l)}`,
+              `Close: $${formatPrice(candle.c)} (${sign}${changePct}%)`,
             ];
           },
         },
@@ -616,20 +683,24 @@ function Analytics() {
 
     scales: {
       x: {
-        type: "time",
+        type: "timeseries",
+        offset: true,
 
         time: {
-          unit: "hour",
-
+          tooltipFormat: "yyyy-MM-dd HH:mm",
           displayFormats: {
+            minute: "HH:mm",
             hour: "HH:mm",
+            day: "MMM d",
           },
         },
 
         ticks: {
           color: colorsForChart(isDark).muted,
-
-          maxTicksLimit: 12,
+          maxTicksLimit: 10,
+          maxRotation: 0,
+          source: "data",
+          autoSkip: true,
         },
 
         grid: {
@@ -1129,26 +1200,51 @@ function Analytics() {
 
               </div>
 
-              {/* Timeframe Interval Selector */}
-              <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                <span style={{ fontSize: "12px", color: colors.muted, marginRight: "4px" }}>
-                  Interval:
-                </span>
-                {["1m", "5m", "15m", "1h"].map((intvl) => (
-                  <button
-                    key={intvl}
-                    onClick={() => setOhlcInterval(intvl)}
-                    style={styles.timeframeButton(ohlcInterval === intvl, isDark)}
-                  >
-                    {intvl.toUpperCase()}
-                  </button>
-                ))}
+              {/* Controls: Visible Candle Window & Interval Selector */}
+              <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+                {/* Visible Candle Window Selector */}
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <span style={{ fontSize: "12px", color: colors.muted, marginRight: "4px" }}>
+                    Candles:
+                  </span>
+                  {[
+                    { label: "30", value: 30 },
+                    { label: "60", value: 60 },
+                    { label: "100", value: 100 },
+                    { label: "All", value: "all" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.label}
+                      onClick={() => setCandleViewCount(opt.value)}
+                      style={styles.timeframeButton(candleViewCount === opt.value, isDark)}
+                      title={`Show ${opt.label} candles`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Timeframe Interval Selector */}
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                  <span style={{ fontSize: "12px", color: colors.muted, marginRight: "4px" }}>
+                    Interval:
+                  </span>
+                  {["1m", "5m", "15m", "1h"].map((intvl) => (
+                    <button
+                      key={intvl}
+                      onClick={() => setOhlcInterval(intvl)}
+                      style={styles.timeframeButton(ohlcInterval === intvl, isDark)}
+                    >
+                      {intvl.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
 
             </div>
 
             {/* OHLC Technical Indicators Summary Ribbon */}
-            {ohlcSummary && (
+            {activeCandleSummary && (
               <div
                 style={{
                   display: "flex",
@@ -1174,7 +1270,7 @@ function Analytics() {
                       fontWeight: "700",
                     }}
                   >
-                    ▲ {ohlcSummary.bullish_candles} Bullish
+                    ▲ {activeCandleSummary.bullish_candles} Bullish
                   </span>
                   <span
                     style={{
@@ -1185,20 +1281,30 @@ function Analytics() {
                       fontWeight: "700",
                     }}
                   >
-                    ▼ {ohlcSummary.bearish_candles} Bearish
+                    ▼ {activeCandleSummary.bearish_candles} Bearish
                   </span>
                 </div>
 
                 <div style={{ width: "1px", height: "14px", backgroundColor: colors.border }}></div>
 
                 <span style={{ color: colors.muted }}>
-                  Range: <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.period_low)}</strong> – <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.period_high)}</strong>
+                  Range:{" "}
+                  <strong style={{ color: colors.title }}>
+                    ${formatPrice(activeCandleSummary.period_low)}
+                  </strong>{" "}
+                  –{" "}
+                  <strong style={{ color: colors.title }}>
+                    ${formatPrice(activeCandleSummary.period_high)}
+                  </strong>
                 </span>
 
                 <div style={{ width: "1px", height: "14px", backgroundColor: colors.border }}></div>
 
                 <span style={{ color: colors.muted }}>
-                  Avg Body: <strong style={{ color: colors.title }}>${formatPrice(ohlcSummary.avg_body_size)}</strong>
+                  Avg Body:{" "}
+                  <strong style={{ color: colors.title }}>
+                    ${formatPrice(activeCandleSummary.avg_body_size)}
+                  </strong>
                 </span>
               </div>
             )}
