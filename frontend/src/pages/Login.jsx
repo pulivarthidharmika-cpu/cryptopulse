@@ -26,6 +26,8 @@ function Login() {
 
       console.log("Login successful:", data);
 
+      localStorage.removeItem("loggedOut");
+
       // Store authentication information
       localStorage.setItem(
         "token",
@@ -198,6 +200,12 @@ function Login() {
             </label>
 
           </div>
+
+          {wasLoggedOut && !error && (
+            <div style={{ ...styles.error, background: "rgba(34, 197, 94, 0.12)", color: "#16a34a", borderColor: "rgba(34, 197, 94, 0.3)" }}>
+              <span>✓ You have been safely logged out.</span>
+            </div>
+          )}
 
           {/* Error */}
 

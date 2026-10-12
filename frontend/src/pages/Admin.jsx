@@ -153,6 +153,41 @@ function Admin() {
   };
 
   // ==================================================
+  // TOGGLE COIN ACTIVE / DISABLED
+  // ==================================================
+
+  const handleToggleCoin = async (coinKey) => {
+    try {
+      setCoinError("");
+      setCoinSuccess("");
+
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(
+        `${BASE_URL}/admin/coins/${encodeURIComponent(coinKey)}/toggle`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to toggle coin status");
+      }
+
+      setCoinSuccess(data.message || `Status updated for '${coinKey}'.`);
+      await fetchCoins();
+    } catch (err) {
+      console.error("Toggle coin error:", err);
+      setCoinError(err.message || "Unable to update coin status.");
+    }
+  };
+
+  // ==================================================
   // FETCH USERS
   // ==================================================
 
@@ -195,12 +230,15 @@ function Admin() {
   };
 
   // ==================================================
-  // LOAD USERS
+  // LOAD USERS & COINS
   // ==================================================
 
   useEffect(() => {
-    fetchUsers();
-    fetchCoins();
+    const loadInitialData = async () => {
+      fetchUsers();
+      fetchCoins();
+    };
+    loadInitialData();
   }, []);
 
   // ==================================================
@@ -767,22 +805,43 @@ function Admin() {
                           </span>
                         </td>
                         <td>
-                          <span className="active-status">● {c.status || "Active"}</span>
+                          <span
+                            className={c.active !== false ? "active-status" : "updating"}
+                            style={{
+                              color: c.active !== false ? "#16a34a" : "#94a3b8",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            ● {c.active !== false ? "Active" : "Disabled"}
+                          </span>
                         </td>
                         <td>
-                          {isCore ? (
-                            <span className="core-badge" title="Core supported cryptocurrency">
-                              System Core
-                            </span>
-                          ) : (
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                             <button
-                              className="delete-coin-btn"
-                              onClick={() => handleDeleteCoin(c.coin)}
-                              disabled={deletingCoin === c.coin}
+                              type="button"
+                              className="refresh-button"
+                              style={{ padding: "4px 10px", fontSize: "0.8rem", cursor: "pointer" }}
+                              onClick={() => handleToggleCoin(c.coin)}
+                              title={c.active !== false ? "Disable coin from selectors" : "Enable coin in selectors"}
                             >
-                              {deletingCoin === c.coin ? "Removing..." : "Remove"}
+                              {c.active !== false ? "Disable" : "Enable"}
                             </button>
-                          )}
+                            {isCore ? (
+                              <span className="core-badge" title="Core supported cryptocurrency">
+                                System Core
+                              </span>
+                            ) : (
+                              <button
+                                className="delete-coin-btn"
+                                onClick={() => handleDeleteCoin(c.coin)}
+                                disabled={deletingCoin === c.coin}
+                              >
+                                {deletingCoin === c.coin ? "Removing..." : "Remove"}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );

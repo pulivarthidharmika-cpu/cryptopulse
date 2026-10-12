@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from models.crypto_model import CryptoPrice, Alert
+from models.crypto_model import CryptoPrice
 from database.database import (
     live_prices_collection,
     historical_prices_collection,
@@ -80,17 +80,19 @@ async def get_latest_prices():
 
 # Get Historical Price Data
 @router.get("/history")
-async def get_history():
+async def get_history(limit: int = 1000):
     try:
+        limit = max(10, min(limit, 5000))
         history = []
 
-        # Fetch Historical Records
-        cursor = historical_prices_collection.find({}, {"_id": 0})
+        # Fetch Recent Historical Records using index
+        cursor = historical_prices_collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
 
         async for document in cursor:
             history.append(document)
+        history.reverse()
 
-        logger.info("Historical prices fetched successfully")
+        logger.info(f"Historical prices fetched successfully ({len(history)} records)")
 
         return {
             "count": len(history),

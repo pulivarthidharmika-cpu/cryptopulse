@@ -1,9 +1,14 @@
 # Import APIRouter to create separate route files
 # Import HTTPException to return proper error responses
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 
 # Import MongoDB collections
-from database.database import historical_prices_collection, live_prices_collection
+from database.database import (
+    historical_prices_collection,
+    live_prices_collection,
+    coins_collection
+)
 
 # Import logger to store success/error logs
 from utils.logger import logger
@@ -14,6 +19,37 @@ from config.settings import SUPPORTED_COINS
 # Python standard libraries
 import statistics
 from datetime import datetime
+
+
+async def get_active_coin_slugs() -> list[str]:
+    """Retrieve active coin keys from MongoDB, falling back to static config."""
+    try:
+        db_coins = await coins_collection.find({"active": True}, {"_id": 0, "coin": 1}).to_list(length=100)
+        if db_coins:
+            slugs = [c["coin"].strip().lower() for c in db_coins if c.get("coin")]
+            if slugs:
+                return slugs
+    except Exception as e:
+        logger.warning(f"Error fetching active coins for analytics: {e}")
+    return SUPPORTED_COINS
+
+
+async def get_active_coin_details() -> dict[str, dict]:
+    """Retrieve mapping of coin key to metadata dictionary."""
+    meta = {}
+    try:
+        db_coins = await coins_collection.find({"active": True}, {"_id": 0}).to_list(length=100)
+        for c in db_coins:
+            k = c.get("coin", "").strip().lower()
+            if k:
+                meta[k] = c
+    except Exception:
+        pass
+    for k in SUPPORTED_COINS:
+        if k not in meta:
+            meta[k] = {"coin": k, "name": k.capitalize(), "symbol": k[:4].upper(), "active": True}
+    return meta
+
 
 
 # --------------------------------------------------
@@ -128,15 +164,16 @@ def detect_volume_spike(volumes, threshold=2):
 # TOP GAINERS / TOP LOSERS
 # ==================================================
 
-def calculate_gainers_and_losers(records):
+def calculate_gainers_and_losers(records, coins=None):
     """
     Calculate top gaining and losing coins
     from the latest historical price records.
     """
 
     market_data = []
+    target_coins = coins if coins is not None else SUPPORTED_COINS
 
-    for coin in SUPPORTED_COINS:
+    for coin in target_coins:
 
         coin_records = [
             item
@@ -194,28 +231,32 @@ def calculate_gainers_and_losers(records):
 async def get_analytics():
 
     try:
+        active_coins = await get_active_coin_slugs()
 
+        # Fast bounded query using indexed (coin, timestamp)
         records = []
+        for coin in active_coins:
+            cursor = historical_prices_collection.find(
+                {"coin": coin},
+                {"_id": 0}
+            ).sort("timestamp", -1).limit(60)
 
-        cursor = historical_prices_collection.find(
-            {},
-            {"_id": 0}
-        ).sort("timestamp", 1)
-
-        async for document in cursor:
-            records.append(document)
+            coin_docs = []
+            async for doc in cursor:
+                coin_docs.append(doc)
+            coin_docs.reverse()
+            records.extend(coin_docs)
 
         # Calculate top gainers and top losers
-        # using the same historical records loaded above.
         gainers_and_losers = calculate_gainers_and_losers(
-            records
+            records, coins=active_coins
         )
 
         analytics = {}
 
         latest_summary = []
 
-        for coin in SUPPORTED_COINS:
+        for coin in active_coins:
 
             coin_records = [
                 item
@@ -647,15 +688,12 @@ async def get_ohlc(
 @router.get("/heatmap")
 async def get_heatmap():
     try:
-        symbols_map = {
-            "bitcoin": "BTC",
-            "ethereum": "ETH",
-            "solana": "SOL",
-        }
+        meta = await get_active_coin_details()
+        active_coins = list(meta.keys())
 
-        # Fetch latest prices for supported coins
+        # Fetch latest prices for active coins
         cursor = live_prices_collection.find(
-            {"coin": {"$in": SUPPORTED_COINS}},
+            {"coin": {"$in": active_coins}},
             {"_id": 0}
         )
 
@@ -667,12 +705,14 @@ async def get_heatmap():
         total_market_cap = 0.0
         total_volume = 0.0
 
-        for coin in SUPPORTED_COINS:
+        for coin in active_coins:
             doc = live_data.get(coin, {})
+            c_meta = meta.get(coin, {})
             price = float(doc.get("price") or 0.0)
             market_cap = float(doc.get("market_cap") or 0.0)
             volume = float(doc.get("volume") or 0.0)
             change = float(doc.get("change_24h") or 0.0)
+            symbol = c_meta.get("symbol") or coin[:4].upper()
 
             total_market_cap += market_cap
             total_volume += volume
@@ -699,7 +739,7 @@ async def get_heatmap():
 
             items.append({
                 "coin": coin,
-                "symbol": symbols_map.get(coin, coin.upper()[:4]),
+                "symbol": symbol,
                 "price": price,
                 "change_24h": round(change, 2),
                 "market_cap": market_cap,
@@ -752,8 +792,9 @@ async def get_heatmap():
 @router.get("/intelligence")
 async def get_market_intelligence():
     try:
+        active_coins = await get_active_coin_slugs()
         cursor = live_prices_collection.find(
-            {"coin": {"$in": SUPPORTED_COINS}},
+            {"coin": {"$in": active_coins}},
             {"_id": 0}
         )
 
@@ -767,7 +808,7 @@ async def get_market_intelligence():
         total_volume = 0.0
         changes = []
 
-        for coin in SUPPORTED_COINS:
+        for coin in active_coins:
             doc = live_data.get(coin, {})
             mcap = float(doc.get("market_cap") or 0.0)
             vol = float(doc.get("volume") or 0.0)
@@ -872,8 +913,9 @@ async def get_market_intelligence():
 @router.get("/volume")
 async def get_volume_analytics():
     try:
+        active_coins = await get_active_coin_slugs()
         cursor = live_prices_collection.find(
-            {"coin": {"$in": SUPPORTED_COINS}},
+            {"coin": {"$in": active_coins}},
             {"_id": 0}
         )
 
@@ -882,7 +924,7 @@ async def get_volume_analytics():
             live_data[doc.get("coin")] = doc
 
         hist_cursor = historical_prices_collection.find(
-            {"coin": {"$in": SUPPORTED_COINS}},
+            {"coin": {"$in": active_coins}},
             {"_id": 0, "coin": 1, "volume": 1, "timestamp": 1}
         ).sort("timestamp", -1).limit(150)
 
@@ -893,7 +935,7 @@ async def get_volume_analytics():
         coin_volumes = {}
         total_volume = 0.0
 
-        for coin in SUPPORTED_COINS:
+        for coin in active_coins:
             live_doc = live_data.get(coin, {})
             vol = float(live_doc.get("volume") or 0.0)
             mcap = float(live_doc.get("market_cap") or 0.0)
@@ -969,13 +1011,18 @@ async def get_volume_analytics():
 # ==================================================
 
 @router.get("/comparative")
-async def get_comparative_analytics(limit: int = 60):
+async def get_comparative_analytics(limit: int = 60, coins: Optional[str] = None):
     try:
         limit = max(5, min(limit, 300))
+        if coins:
+            target_coins = [c.strip().lower() for c in coins.split(",") if c.strip()]
+        else:
+            target_coins = await get_active_coin_slugs()
+
         performance = {}
         time_series_by_coin = {}
 
-        for coin in SUPPORTED_COINS:
+        for coin in target_coins:
             cursor = historical_prices_collection.find(
                 {"coin": coin},
                 {"_id": 0, "price": 1, "timestamp": 1, "volume": 1}
@@ -1033,7 +1080,7 @@ async def get_comparative_analytics(limit: int = 60):
         primary_coin = max(
             time_series_by_coin.keys(),
             key=lambda c: len(time_series_by_coin[c]),
-            default="bitcoin"
+            default=target_coins[0] if target_coins else "bitcoin"
         )
         primary_docs = time_series_by_coin.get(primary_coin, [])
 
@@ -1046,7 +1093,7 @@ async def get_comparative_analytics(limit: int = 60):
                 "timestamp": ts,
                 "time": time_str,
             }
-            for coin in SUPPORTED_COINS:
+            for coin in target_coins:
                 docs = time_series_by_coin.get(coin, [])
                 if idx < len(docs) and base_prices.get(coin):
                     curr_price = float(docs[idx]["price"])
@@ -1077,4 +1124,166 @@ async def get_comparative_analytics(limit: int = 60):
 
     except Exception as e:
         logger.error(f"Comparative analytics failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================================================
+# DEDICATED MULTI-COIN COMPARISON API
+# GET /analytics/comparison
+# ==================================================
+
+@router.get("/comparison")
+async def get_comparison_data(
+    coins: str,
+    timeframe: str = "24h",
+    limit: int = 60
+):
+    """
+    Dedicated multi-coin comparison endpoint.
+    - Requires 2 to 5 coins (comma-separated slugs).
+    - Returns real-time metrics (current price, 24h change, 24h volume, market cap)
+      and historical normalized % change series aligned on shared time period.
+    - Gracefully handles missing metrics as None/Unavailable.
+    """
+    try:
+        requested = [c.strip().lower() for c in coins.split(",") if c.strip()]
+        unique_coins = list(dict.fromkeys(requested))
+
+        if len(unique_coins) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Please select at least 2 cryptocurrencies to compare."
+            )
+        if len(unique_coins) > 5:
+            raise HTTPException(
+                status_code=400,
+                detail="A maximum of 5 cryptocurrencies can be compared simultaneously."
+            )
+
+        limit = max(10, min(limit, 200))
+        meta_map = await get_active_coin_details()
+
+        # Fetch latest live market data for each selected coin
+        live_cursor = live_prices_collection.find(
+            {"coin": {"$in": unique_coins}},
+            {"_id": 0}
+        )
+        live_by_coin = {}
+        async for doc in live_cursor:
+            live_by_coin[doc.get("coin")] = doc
+
+        # Fetch historical series for each coin
+        series_by_coin = {}
+        metrics_by_coin = []
+        all_timestamps = set()
+
+        for coin in unique_coins:
+            meta = meta_map.get(coin, {"name": coin.capitalize(), "symbol": coin[:4].upper()})
+            live_doc = live_by_coin.get(coin, {})
+
+            cursor = historical_prices_collection.find(
+                {"coin": coin},
+                {"_id": 0, "price": 1, "timestamp": 1, "volume": 1}
+            ).sort("timestamp", -1).limit(limit)
+
+            docs = []
+            async for d in cursor:
+                if d.get("price") is not None and d.get("timestamp"):
+                    docs.append(d)
+                    all_timestamps.add(d["timestamp"])
+            docs.reverse()
+            series_by_coin[coin] = docs
+
+            curr_price = live_doc.get("price")
+            if curr_price is None and docs:
+                curr_price = docs[-1].get("price")
+
+            curr_change = live_doc.get("change_24h")
+            curr_volume = live_doc.get("volume")
+            curr_mcap = live_doc.get("market_cap")
+
+            # Calculate period percentage return if historical prices exist
+            period_return = None
+            start_price = None
+            if docs:
+                start_price = float(docs[0]["price"])
+                end_price = float(docs[-1]["price"])
+                if start_price > 0:
+                    period_return = round(((end_price - start_price) / start_price) * 100, 2)
+
+            metrics_by_coin.append({
+                "coin": coin,
+                "name": meta.get("name") or coin.capitalize(),
+                "symbol": (meta.get("symbol") or coin[:4]).upper(),
+                "current_price": float(curr_price) if curr_price is not None else None,
+                "change_24h": float(curr_change) if curr_change is not None else None,
+                "volume_24h": float(curr_volume) if curr_volume is not None else None,
+                "market_cap": float(curr_mcap) if curr_mcap is not None else None,
+                "period_return_pct": period_return,
+                "start_price": start_price,
+                "data_points": len(docs),
+                "data_timestamp": live_doc.get("timestamp") or (docs[-1].get("timestamp") if docs else None),
+            })
+
+        # Build chronologically aligned normalized comparison series
+        sorted_timestamps = sorted(list(all_timestamps))
+        normalized_series = []
+
+        base_prices = {}
+        for coin, docs in series_by_coin.items():
+            if docs and float(docs[0]["price"]) > 0:
+                base_prices[coin] = float(docs[0]["price"])
+
+        price_lookup = {
+            coin: {d["timestamp"]: float(d["price"]) for d in docs}
+            for coin, docs in series_by_coin.items()
+        }
+
+        last_known = {coin: base_prices.get(coin) for coin in unique_coins}
+
+        for ts in sorted_timestamps:
+            point = {
+                "timestamp": ts,
+                "time": str(ts)[11:19] if "T" in str(ts) else str(ts)[-8:],
+            }
+            for coin in unique_coins:
+                if ts in price_lookup[coin]:
+                    price = price_lookup[coin][ts]
+                    last_known[coin] = price
+                else:
+                    price = last_known.get(coin)
+
+                base = base_prices.get(coin)
+                if price is not None and base and base > 0:
+                    pct = round(((price - base) / base) * 100, 2)
+                    point[coin] = pct
+                    point[f"{coin}_pct"] = pct
+                    point[f"{coin}_price"] = price
+                else:
+                    point[coin] = None
+                    point[f"{coin}_pct"] = None
+                    point[f"{coin}_price"] = None
+
+            normalized_series.append(point)
+
+        logger.info(f"Comparison data generated for {len(unique_coins)} coins")
+
+        return {
+            "status": "success",
+            "timeframe": timeframe,
+            "currency": "usd",
+            "coins": unique_coins,
+            "compared_coins": unique_coins,
+            "metrics": metrics_by_coin,
+            "normalized_series": normalized_series,
+            "chart_series": normalized_series,
+            "timeframe_limit": limit,
+            "data_points": len(normalized_series),
+            "generated_at": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Coin comparison endpoint failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

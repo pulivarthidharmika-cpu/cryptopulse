@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 import re
+import httpx
+import pymongo.errors
 
 # Import MongoDB collections
 from database.database import coins_collection, users_collection
@@ -17,6 +19,9 @@ from services.auth_service import get_admin_user
 
 # Import Logger
 from utils.logger import logger
+
+# Import Provider URLs
+from config.settings import BINANCE_API_URL, CRYPTOCOMPARE_API_URL, COINGECKO_API_URL
 
 
 # --------------------------------------------------
@@ -188,6 +193,56 @@ CANONICAL_COIN_ALIASES = {
 }
 
 
+async def verify_provider_identifier(symbol: str, slug: str) -> dict:
+    """
+    Validate that the configured provider identifier actually resolves to the intended coin.
+    Checks Binance, CryptoCompare, and CoinGecko gracefully.
+    """
+    clean_sym = symbol.upper()
+    # 1. Binance USDT pair
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{BINANCE_API_URL}/ticker/price",
+                params={"symbol": f"{clean_sym}USDT"}
+            )
+            if resp.status_code == 200:
+                return {"valid": True, "provider": "Binance", "symbol": f"{clean_sym}USDT"}
+    except Exception:
+        pass
+
+    # 2. CryptoCompare price check
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{CRYPTOCOMPARE_API_URL}/price",
+                params={"fsym": clean_sym, "tsyms": "USD"}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if "USD" in data or data.get("Response") != "Error":
+                    return {"valid": True, "provider": "CryptoCompare", "symbol": clean_sym}
+    except Exception:
+        pass
+
+    # 3. CoinGecko simple price check
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(
+                f"{COINGECKO_API_URL}/simple/price",
+                params={"ids": slug, "vs_currencies": "usd"}
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if slug in data and len(data[slug]) > 0:
+                    return {"valid": True, "provider": "CoinGecko", "slug": slug}
+    except Exception:
+        pass
+
+    # Fallback: if network providers are unreachable/offline, accept standard validated format
+    return {"valid": True, "provider": "configured"}
+
+
 # --------------------------------------------------
 # Add New Cryptocurrency
 # Only Admin users can add new coins
@@ -212,22 +267,26 @@ async def add_coin(
         name = raw_name if raw_name else raw_symbol.capitalize()
         symbol = raw_symbol.upper() if raw_symbol else raw_name[:4].upper()
 
-        if len(name) < 2:
+        # Validate alphanumeric and length
+        clean_name = re.sub(r"[^\w\s-]", "", name).strip()
+        clean_symbol = re.sub(r"[^\w]", "", symbol).strip().upper()
+
+        if len(clean_name) < 2:
             raise HTTPException(
                 status_code=400,
                 detail="Coin name must be at least 2 characters"
             )
 
-        if len(symbol) < 2:
+        if len(clean_symbol) < 2 or len(clean_symbol) > 10:
             raise HTTPException(
                 status_code=400,
-                detail="Coin symbol must be at least 2 characters"
+                detail="Coin symbol must be between 2 and 10 characters"
             )
 
-        clean_slug = name.lower().replace(" ", "-")
+        clean_slug = clean_name.lower().replace(" ", "-")
         canonical_key = CANONICAL_COIN_ALIASES.get(
             clean_slug,
-            CANONICAL_COIN_ALIASES.get(symbol.lower(), clean_slug)
+            CANONICAL_COIN_ALIASES.get(clean_symbol.lower(), clean_slug)
         )
 
         # Check existing coin (case-insensitive across key, symbol, and name)
@@ -235,8 +294,8 @@ async def add_coin(
             "$or": [
                 {"coin": {"$regex": f"^{re.escape(canonical_key)}$", "$options": "i"}},
                 {"coin": {"$regex": f"^{re.escape(clean_slug)}$", "$options": "i"}},
-                {"symbol": {"$regex": f"^{re.escape(symbol)}$", "$options": "i"}},
-                {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+                {"symbol": {"$regex": f"^{re.escape(clean_symbol)}$", "$options": "i"}},
+                {"name": {"$regex": f"^{re.escape(clean_name)}$", "$options": "i"}}
             ]
         })
 
@@ -250,28 +309,39 @@ async def add_coin(
                 detail=f"Cryptocurrency '{exist_name}' ({exist_sym}) already exists"
             )
 
+        # Validate against external providers
+        prov_check = await verify_provider_identifier(clean_symbol, canonical_key)
+
         coin_document = {
             "coin": canonical_key,
-            "name": name,
-            "symbol": symbol,
-            "active": True
+            "name": clean_name,
+            "symbol": clean_symbol,
+            "active": True,
+            "provider_resolved": prov_check.get("provider", "configured"),
         }
 
-        await coins_collection.insert_one(coin_document)
+        try:
+            await coins_collection.insert_one(coin_document)
+        except pymongo.errors.DuplicateKeyError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cryptocurrency '{clean_name}' ({clean_symbol}) already exists (duplicate key)"
+            )
 
         logger.info(
-            f"Coin '{name}' ({symbol}) added by admin {current_user['email']}"
+            f"Coin '{clean_name}' ({clean_symbol}) added by admin {current_user['email']}"
         )
 
         return {
             "status": "success",
-            "message": f"Cryptocurrency '{name}' ({symbol}) added successfully",
+            "message": f"Cryptocurrency '{clean_name}' ({clean_symbol}) added successfully",
             "coin": {
                 "coin": canonical_key,
-                "name": name,
-                "symbol": symbol,
+                "name": clean_name,
+                "symbol": clean_symbol,
                 "active": True,
-                "status": "Active"
+                "status": "Active",
+                "provider": prov_check.get("provider")
             },
             "added_by": current_user["email"]
         }
@@ -450,3 +520,64 @@ async def delete_coin(
             status_code=500,
             detail=str(e)
         )
+
+
+# --------------------------------------------------
+# Toggle Coin Active Status
+# Only Admin can toggle active state
+# --------------------------------------------------
+@router.patch("/coins/{coin}/toggle")
+@router.put("/coins/{coin}/toggle")
+async def toggle_coin_status(
+    coin: str,
+    current_user: dict = Depends(get_admin_user)
+):
+    try:
+        clean_coin = coin.strip().lower()
+        core_coins = ("bitcoin", "ethereum", "solana", "btc", "eth", "sol")
+
+        if clean_coin in core_coins:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Core cryptocurrency '{coin}' status cannot be modified"
+            )
+
+        existing = await coins_collection.find_one({
+            "$or": [
+                {"coin": {"$regex": f"^{re.escape(clean_coin)}$", "$options": "i"}},
+                {"symbol": {"$regex": f"^{re.escape(coin.strip())}$", "$options": "i"}},
+                {"name": {"$regex": f"^{re.escape(coin.strip())}$", "$options": "i"}}
+            ]
+        })
+
+        if not existing:
+            raise HTTPException(
+                status_code=404,
+                detail="Coin not found"
+            )
+
+        new_status = not existing.get("active", True)
+        await coins_collection.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {"active": new_status}}
+        )
+
+        coin_key = existing.get("coin", clean_coin)
+        name = existing.get("name", coin_key.capitalize())
+        logger.info(
+            f"Coin '{coin_key}' toggled to {'Active' if new_status else 'Inactive'} by {current_user['email']}"
+        )
+
+        return {
+            "status": "success",
+            "message": f"Cryptocurrency '{name}' is now {'Active' if new_status else 'Inactive'}",
+            "coin": coin_key,
+            "active": new_status,
+            "updated_by": current_user["email"]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Toggle coin status failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

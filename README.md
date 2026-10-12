@@ -132,30 +132,46 @@ Access services:
 
 ---
 
-### Option B: Local Development Setup
+### Option B: Local VS Code Development Setup (Windows)
 
-#### 1. Start Infrastructure Services
-Start Kafka and MongoDB in Docker:
-```bash
-docker-compose up -d mongo zookeeper kafka
+#### Prerequisites
+- **Python 3.10+**: with existing virtual environment in `.\venv`
+- **Node.js 18+ & npm 9+**: for Vite frontend
+- **MongoDB**: running locally on `localhost:27017` or via Docker
+- **(Optional) Apache Kafka**: running on `localhost:9092` (app automatically falls back gracefully if Kafka is offline)
+
+#### Step 1: Open Project in VS Code
+Open VS Code and navigate to `C:\cryptopulse`:
+```powershell
+code C:\cryptopulse
 ```
 
-#### 2. Backend Setup
-```bash
-cd backend
-python -m venv venv
-venv\Scripts\activate  # On Windows (or source venv/bin/activate on Linux/Mac)
-pip install -r requirements.txt
+#### Step 2: Start the FastAPI Backend
+Open a terminal in VS Code (`Ctrl + ~` or Terminal -> New Terminal):
+```powershell
+# Navigate to backend directory and activate virtual environment
+cd C:\cryptopulse\backend
+..\venv\Scripts\Activate.ps1
 
-# Run FastAPI backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# Start the FastAPI application with Uvicorn
+python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
+- **Backend API**: `http://localhost:8000`
+- **Interactive Swagger Docs**: `http://localhost:8000/docs`
+- **Health Telemetry**: `http://localhost:8000/health/detailed`
 
-#### 3. Frontend Setup
-```bash
-cd frontend
-npm install
+#### Step 3: Start the React Frontend
+Open a second terminal in VS Code:
+```powershell
+cd C:\cryptopulse\frontend
 npm run dev
+```
+- **Frontend Application**: `http://localhost:5173`
+
+#### Step 4: Optional Kafka & MongoDB via Docker Compose
+If running infrastructure services in Docker:
+```powershell
+docker-compose up -d mongo zookeeper kafka
 ```
 
 ---
@@ -188,8 +204,10 @@ npm run dev
 | :--- | :--- | :--- | :--- |
 | **Health** | `/health` | `GET` | Basic API liveness probe |
 | **Health** | `/health/detailed` | `GET` | Deep status check (Mongo, Kafka, Binance, WebSockets) |
+| **Prices** | `/prices/coins` | `GET` | Dynamic active supported cryptocurrencies list |
 | **Prices** | `/prices/latest` | `GET` | Latest prices and 24h statistics |
-| **Prices** | `/prices/history` | `GET` | Historical time-series price data |
+| **Prices** | `/prices/history` | `GET` | Bounded historical time-series price data (`coin`, `limit`) |
+| **Analytics** | `/analytics/comparison` | `GET` | Multi-coin normalized performance (% return) & metrics (2-5 coins) |
 | **Analytics** | `/analytics/heatmap` | `GET` | Relative performance and intensity scoring |
 | **Analytics** | `/analytics/ohlc/{coin}` | `GET` | Aggregated candlesticks (1m, 5m, 15m, 1h) & SMAs |
 | **Analytics** | `/analytics/comparative` | `GET` | Normalized comparative performance trends |
@@ -197,7 +215,9 @@ npm run dev
 | **Alerts** | `/alerts/` | `GET` / `POST` | Manage user price alerts |
 | **Auth** | `/auth/signup` | `POST` | Create new user account |
 | **Auth** | `/auth/login` | `POST` | Authenticate and obtain JWT token |
-| **Admin** | `/admin/coins` | `GET` / `POST` | Admin supported coin configuration |
+| **Admin** | `/admin/coins` | `GET` / `POST` | Admin supported coin configuration with provider validation |
+| **Admin** | `/admin/coins/{coin}/toggle` | `PATCH` / `PUT` | Toggle coin active/disabled status |
+| **Admin** | `/admin/coins/{coin}` | `DELETE` | Remove coin configuration safely |
 
 ### WebSocket Endpoints
 
@@ -207,16 +227,24 @@ npm run dev
 
 ---
 
-## 🧪 Verification & Testing
+## 🧪 Verification & Automated Testing
 
-Verify system components:
+### Backend Unit & Integration Tests (19 Automated Tests)
+Run the complete backend test suite:
+```powershell
+.\venv\Scripts\python.exe -m unittest discover -s backend/tests -p "test_*.py"
+```
+Test modules cover:
+- `test_price_routes.py`: Active coins, latest prices, bounded historical pagination
+- `test_admin_coin_routes.py`: Role authorization, validation, duplicate prevention, core coin deletion protection, active toggling
+- `test_comparison_routes.py`: 2-5 coin validation, percentage normalization starting at 0.00%, financial metrics
+- `test_db_performance.py`: MongoDB compound indexes, unique constraints, and sub-50ms query benchmarks
 
-```bash
-# Verify backend configuration & health
-python -c "import sys; sys.path.insert(0, 'backend'); from config.settings import validate_configuration; print(validate_configuration())"
-
-# Test frontend production build
-cd frontend && npm run build
+### Frontend Linting & Production Build
+```powershell
+cd frontend
+npm run lint    # ESLint check (0 errors, 0 warnings)
+npm run build   # Production build with code-splitting chunks
 ```
 
 ---

@@ -92,19 +92,7 @@ function Settings() {
     window.dispatchEvent(new Event("storage"));
   };
 
-  // --------------------------------------------------
-  // Load saved profile
-  // --------------------------------------------------
 
-  useEffect(() => {
-    const savedName =
-      localStorage.getItem("profileName");
-
-    if (savedName) {
-      setName(savedName);
-      setEditName(savedName);
-    }
-  }, []);
 
   // --------------------------------------------------
   // Notifications

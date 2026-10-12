@@ -51,18 +51,28 @@ CRYPTOCOMPARE_SYMBOLS = {
 # ============================================================
 
 async def get_active_coins():
+    try:
+        coins = await coins_collection.find(
+            {"active": True},
+            {"_id": 0, "coin": 1, "symbol": 1, "name": 1}
+        ).to_list(length=200)
 
-    coins = await coins_collection.find(
-        {"active": True, "coin": {"$in": SUPPORTED_COINS}},
-        {"_id": 0, "coin": 1}
-    ).to_list(length=100)
+        if coins:
+            for c in coins:
+                coin_key = c.get("coin", "").strip().lower()
+                sym = (c.get("symbol") or coin_key[:4]).strip().upper()
+                if coin_key not in BINANCE_SYMBOLS:
+                    BINANCE_SYMBOLS[coin_key] = f"{sym}USDT"
+                if coin_key not in CRYPTOCOMPARE_SYMBOLS:
+                    CRYPTOCOMPARE_SYMBOLS[coin_key] = sym
 
-    if coins:
-        return [
-            coin["coin"].strip().lower()
-            for coin in coins
-            if coin.get("coin")
-        ]
+            return [
+                coin["coin"].strip().lower()
+                for coin in coins
+                if coin.get("coin")
+            ]
+    except Exception as e:
+        logger.warning(f"Failed to fetch active coins from DB: {e}")
 
     return SUPPORTED_COINS
 

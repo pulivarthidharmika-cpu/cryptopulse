@@ -131,6 +131,23 @@ function Layout() {
             </NavLink>
 
 
+            {/* Coin Comparison */}
+
+            <NavLink
+              to="/comparison"
+              onClick={() => setSidebarOpen(false)}
+              style={({ isActive }) => ({
+                ...styles.link,
+                ...(isActive
+                  ? styles.activeLink
+                  : {}),
+              })}
+            >
+              <span>⚖</span>
+              Coin Comparison
+            </NavLink>
+
+
             {/* Alerts */}
 
             <NavLink

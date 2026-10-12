@@ -11,7 +11,7 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database.database import coins_collection, users_collection
+from database.database import coins_collection, users_collection, init_db_indexes
 from config.settings import (
     SUPPORTED_COINS,
     ADMIN_EMAIL,
@@ -26,6 +26,7 @@ from routers.alert_routes import router as alert_router
 from routers.auth_routes import router as auth_router
 from routers.admin_routes import router as admin_router
 from routers.health_routes import router as health_router
+from routers.crypto_routes import router as crypto_router
 
 from services.api_fetcher import fetch_and_publish_prices
 from services.alert_engine import check_alerts
@@ -116,19 +117,35 @@ async def startup_event():
         )
 
     # ----------------------------------------------
+    # Initialize Database Indexes
+    # ----------------------------------------------
+    try:
+        await init_db_indexes()
+        logger.info("MongoDB indexes initialized successfully")
+    except Exception as e:
+        logger.warning(f"Could not initialize database indexes: {str(e)}")
+
+    # ----------------------------------------------
     # Seed Supported Coins in MongoDB
     # ----------------------------------------------
     try:
+        core_meta = {
+            "bitcoin": {"name": "Bitcoin", "symbol": "BTC"},
+            "ethereum": {"name": "Ethereum", "symbol": "ETH"},
+            "solana": {"name": "Solana", "symbol": "SOL"},
+        }
         for coin in SUPPORTED_COINS:
+            meta = core_meta.get(coin, {"name": coin.capitalize(), "symbol": coin[:4].upper()})
             await coins_collection.update_one(
                 {"coin": coin},
-                {"$setOnInsert": {"coin": coin, "active": True}},
+                {"$setOnInsert": {
+                    "coin": coin,
+                    "name": meta["name"],
+                    "symbol": meta["symbol"],
+                    "active": True
+                }},
                 upsert=True
             )
-        await coins_collection.update_many(
-            {"coin": {"$nin": SUPPORTED_COINS}},
-            {"$set": {"active": False}}
-        )
         logger.info("Default supported coins verified in MongoDB")
     except Exception as e:
         logger.warning(f"Could not seed default coins: {str(e)}")
@@ -234,6 +251,10 @@ app.include_router(
 
 app.include_router(
     health_router
+)
+
+app.include_router(
+    crypto_router
 )
 
 

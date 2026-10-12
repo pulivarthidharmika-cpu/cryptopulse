@@ -49,7 +49,7 @@ export async function loginUser(email, password) {
   } catch (err) {
     clearTimeout(timeoutId);
     if (err.name === "AbortError") {
-      throw new Error("Login request timed out. Please verify your connection.");
+      throw new Error("Login request timed out. Please verify your connection.", { cause: err });
     }
     throw err;
   }

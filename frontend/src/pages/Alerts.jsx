@@ -29,14 +29,32 @@ function Alerts() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
+  const [availableCoins, setAvailableCoins] = useState([
+    { coin: "bitcoin", name: "Bitcoin", symbol: "BTC" },
+    { coin: "ethereum", name: "Ethereum", symbol: "ETH" },
+    { coin: "solana", name: "Solana", symbol: "SOL" },
+  ]);
+
   const token = localStorage.getItem("token");
+
+  // Fetch Available Active Coins
+  const fetchAvailableCoins = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/prices/coins`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.coins) && data.coins.length > 0) {
+          setAvailableCoins(data.coins);
+        }
+      }
+    } catch (err) {
+      console.debug("Failed to fetch dynamic coins, using defaults:", err);
+    }
+  };
 
   // Fetch Existing Alerts from MongoDB
   const fetchAlerts = async () => {
     try {
-      setLoading(true);
-      setError("");
-
       const response = await fetch(`${BASE_URL}/alerts/`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -49,6 +67,7 @@ function Alerts() {
 
       const result = await response.json();
       setAlerts(result.data || []);
+      setError("");
     } catch (err) {
       console.error("Alerts fetch error:", err);
       setError("Unable to load alerts. Please check backend connection.");
@@ -58,7 +77,12 @@ function Alerts() {
   };
 
   useEffect(() => {
-    fetchAlerts();
+    const loadInitialData = async () => {
+      fetchAlerts();
+      fetchAvailableCoins();
+    };
+    loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Real-Time Alert WebSocket Listener
@@ -361,7 +385,7 @@ function Alerts() {
         </div>
       ) : (
         <div className="alerts-grid">
-          {alerts.map((alert) => {
+          {alerts.map((alert, index) => {
             const coinLower = (alert.coin || "").toLowerCase();
             const coinUpper = (alert.coin || "CRYPTO").toUpperCase();
             const isTriggered = alert.status === "triggered";
@@ -369,7 +393,7 @@ function Alerts() {
 
             return (
               <div
-                key={alert._id || `${alert.coin}-${alert.target_price}-${Math.random()}`}
+                key={alert._id || `${alert.coin}-${alert.target_price}-${index}`}
                 className={`alert-card ${isTriggered ? "card-triggered" : "card-active"}`}
               >
                 <div className="alert-card-header">
@@ -494,9 +518,11 @@ function Alerts() {
                   onChange={(e) => setNewCoin(e.target.value)}
                   className="modal-select"
                 >
-                  <option value="bitcoin">Bitcoin (BTC)</option>
-                  <option value="ethereum">Ethereum (ETH)</option>
-                  <option value="solana">Solana (SOL)</option>
+                  {availableCoins.map((ac) => (
+                    <option key={ac.coin} value={ac.coin}>
+                      {ac.name || ac.coin.charAt(0).toUpperCase() + ac.coin.slice(1)} ({ac.symbol || ac.coin.toUpperCase()})
+                    </option>
+                  ))}
                 </select>
               </div>
 

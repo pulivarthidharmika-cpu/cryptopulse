@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDetailedHealth } from "../services/api";
 
@@ -13,7 +13,7 @@ function Navbar({ onMenuClick }) {
   const [healthLoading, setHealthLoading] = useState(false);
   const [showHealthModal, setShowHealthModal] = useState(false);
 
-  const fetchHealth = async () => {
+  const fetchHealth = useCallback(async () => {
     try {
       setHealthLoading(true);
       const res = await getDetailedHealth();
@@ -23,12 +23,26 @@ function Navbar({ onMenuClick }) {
     } finally {
       setHealthLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 25000);
-    return () => clearInterval(interval);
+    let isMounted = true;
+    const run = async () => {
+      try {
+        const res = await getDetailedHealth();
+        if (isMounted) setHealthData(res);
+      } catch (err) {
+        console.warn("Could not fetch detailed health:", err);
+      } finally {
+        if (isMounted) setHealthLoading(false);
+      }
+    };
+    run();
+    const interval = setInterval(run, 25000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {

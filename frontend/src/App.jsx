@@ -1,24 +1,45 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import {
   Routes,
   Route,
   Navigate,
 } from "react-router-dom";
 
-// Pages
+// Eager public pages
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Analytics from "./pages/Analytics";
-import Settings from "./pages/Settings";
-import Alerts from "./pages/Alerts";
-import Admin from "./pages/Admin";
+
+// Lazy-loaded app pages for instant route transitions & code splitting
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const CoinComparison = lazy(() => import("./pages/CoinComparison"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Alerts = lazy(() => import("./pages/Alerts"));
+const Admin = lazy(() => import("./pages/Admin"));
 
 // Components
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 
+const PageLoader = () => (
+  <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh", color: "#64748b" }}>
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          width: "36px",
+          height: "36px",
+          border: "3px solid #3b82f6",
+          borderTopColor: "transparent",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+          margin: "0 auto 12px auto",
+        }}
+      />
+      <span style={{ fontSize: "0.9rem" }}>Loading page...</span>
+    </div>
+  </div>
+);
 
 function App() {
   useEffect(() => {
@@ -35,75 +56,81 @@ function App() {
   }, []);
 
   return (
-    <Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
 
-      {/* ========================================= */}
-      {/* PUBLIC PAGES */}
-      {/* ========================================= */}
-
-      <Route
-        path="/"
-        element={<Home />}
-      />
-
-      <Route
-        path="/login"
-        element={<Login />}
-      />
-
-      <Route
-        path="/register"
-        element={<Register />}
-      />
-
-
-      {/* ========================================= */}
-      {/* PROTECTED APPLICATION */}
-      {/* ========================================= */}
-
-      <Route
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+        {/* ========================================= */}
+        {/* PUBLIC PAGES */}
+        {/* ========================================= */}
 
         <Route
-          path="/dashboard"
-          element={<Dashboard />}
+          path="/"
+          element={<Home />}
         />
 
         <Route
-          path="/analytics"
-          element={<Analytics />}
+          path="/login"
+          element={<Login />}
         />
 
         <Route
-          path="/alerts"
-          element={<Alerts />}
+          path="/register"
+          element={<Register />}
         />
+
+
+        {/* ========================================= */}
+        {/* PROTECTED APPLICATION */}
+        {/* ========================================= */}
 
         <Route
-          path="/settings"
-          element={<Settings />}
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+
+          <Route
+            path="/dashboard"
+            element={<Dashboard />}
+          />
+
+          <Route
+            path="/analytics"
+            element={<Analytics />}
+          />
+
+          <Route
+            path="/comparison"
+            element={<CoinComparison />}
+          />
+
+          <Route
+            path="/alerts"
+            element={<Alerts />}
+          />
+
+          <Route
+            path="/settings"
+            element={<Settings />}
+          />
+
+        </Route>
+
+
+        {/* ========================================= */}
+        {/* ADMIN PAGE */}
+        {/* ========================================= */}
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <Admin />
+            </ProtectedRoute>
+          }
         />
-
-      </Route>
-
-
-      {/* ========================================= */}
-      {/* ADMIN PAGE */}
-      {/* ========================================= */}
-
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute adminOnly>
-            <Admin />
-          </ProtectedRoute>
-        }
-      />
 
 
       {/* ========================================= */}
@@ -120,7 +147,8 @@ function App() {
         }
       />
 
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 

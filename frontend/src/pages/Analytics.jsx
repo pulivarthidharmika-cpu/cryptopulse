@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 
 import {
   LineChart,
@@ -94,7 +94,7 @@ function Analytics() {
   useEffect(() => {
     const fetchAvailableCoins = async () => {
       try {
-        const res = await fetch(`${BASE_URL}/coins`);
+        const res = await fetch(`${BASE_URL}/prices/coins`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.coins) && data.coins.length > 0) {
@@ -147,12 +147,11 @@ function Analytics() {
     };
 
     window.addEventListener("storage", updateTheme);
-
-    const interval = setInterval(updateTheme, 500);
+    window.addEventListener("themechange", updateTheme);
 
     return () => {
       window.removeEventListener("storage", updateTheme);
-      clearInterval(interval);
+      window.removeEventListener("themechange", updateTheme);
     };
   }, []);
 
@@ -169,16 +168,14 @@ function Analytics() {
      FETCH HISTORICAL PRICE DATA
   ============================================================ */
 
-  const fetchHistory = async (showLoading = true) => {
+  const fetchHistory = useCallback(async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
 
-      setError("");
-
       const response = await fetch(
-        `${BASE_URL}/prices/history`
+        `${BASE_URL}/prices/history?coin=${selectedCoin}&limit=1000`
       );
 
       if (!response.ok) {
@@ -189,9 +186,8 @@ function Analytics() {
 
       const result = await response.json();
 
-      console.log("History data:", result);
-
       setHistory(result.data || []);
+      setError("");
     } catch (err) {
       console.error("History fetch error:", err);
 
@@ -203,14 +199,14 @@ function Analytics() {
         setLoading(false);
       }
     }
-  };
+  }, [selectedCoin]);
 
 
   /* ============================================================
      FETCH OHLC / CANDLESTICK DATA
   ============================================================ */
 
-  const fetchOHLC = async () => {
+  const fetchOHLC = useCallback(async () => {
     try {
       const response = await fetch(
         `${BASE_URL}/analytics/ohlc/${selectedCoin}?interval=${ohlcInterval}`
@@ -228,21 +224,15 @@ function Analytics() {
       setOhlcSummary(result.summary || null);
     } catch (err) {
       console.error("OHLC fetch error:", err);
-
-      /*
-       * Do not replace the main page error here.
-       * The historical line chart can still work
-       * even if OHLC temporarily fails.
-       */
     }
-  };
+  }, [selectedCoin, ohlcInterval]);
 
 
   /* ============================================================
      FETCH TRADING VOLUME ANALYTICS
   ============================================================ */
 
-  const fetchVolume = async () => {
+  const fetchVolume = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/analytics/volume`);
       if (response.ok) {
@@ -252,14 +242,14 @@ function Analytics() {
     } catch (err) {
       console.error("Volume fetch error:", err);
     }
-  };
+  }, []);
 
 
   /* ============================================================
      FETCH COMPARATIVE PERFORMANCE
   ============================================================ */
 
-  const fetchComparative = async () => {
+  const fetchComparative = useCallback(async () => {
     try {
       const response = await fetch(
         `${BASE_URL}/analytics/comparative?limit=${timeframeLimit}`
@@ -271,14 +261,14 @@ function Analytics() {
     } catch (err) {
       console.error("Comparative fetch error:", err);
     }
-  };
+  }, [timeframeLimit]);
 
 
   /* ============================================================
      REFRESH ALL ANALYTICS
   ============================================================ */
 
-  const refreshAll = async (showLoading = false) => {
+  const refreshAll = useCallback(async (showLoading = false) => {
     setIsRefreshing(true);
     await Promise.allSettled([
       fetchHistory(showLoading),
@@ -288,7 +278,7 @@ function Analytics() {
     ]);
     setLastUpdated(new Date().toLocaleTimeString());
     setIsRefreshing(false);
-  };
+  }, [fetchHistory, fetchOHLC, fetchVolume, fetchComparative]);
 
 
   /* ============================================================
@@ -296,7 +286,17 @@ function Analytics() {
   ============================================================ */
 
   useEffect(() => {
-    refreshAll(true);
+    const loadInitial = async () => {
+      await Promise.allSettled([
+        fetchHistory(true),
+        fetchOHLC(),
+        fetchVolume(),
+        fetchComparative(),
+      ]);
+      setLastUpdated(new Date().toLocaleTimeString());
+    };
+    loadInitial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
 
@@ -305,8 +305,11 @@ function Analytics() {
   ============================================================ */
 
   useEffect(() => {
-    fetchComparative();
-  }, [timeframeLimit]);
+    const loadComp = async () => {
+      await fetchComparative();
+    };
+    loadComp();
+  }, [fetchComparative]);
 
 
   /* ============================================================
@@ -314,8 +317,11 @@ function Analytics() {
   ============================================================ */
 
   useEffect(() => {
-    fetchOHLC();
-  }, [selectedCoin, ohlcInterval]);
+    const loadOHLC = async () => {
+      await fetchOHLC();
+    };
+    loadOHLC();
+  }, [fetchOHLC]);
 
 
   /* ============================================================
@@ -332,16 +338,7 @@ function Analytics() {
     return () => {
       clearInterval(refreshInterval);
     };
-  }, [selectedCoin, timeframeLimit, ohlcInterval, isStreaming, pollInterval]);
-
-
-  /* ============================================================
-     FILTER SELECTED COIN
-  ============================================================ */
-
-  useEffect(() => {
-    setSelectedHistoricalDate("all");
-  }, [selectedCoin]);
+  }, [isStreaming, pollInterval, refreshAll]);
 
   const getRecordDateKey = (ts) => {
     if (!ts) return "";
@@ -353,72 +350,90 @@ function Analytics() {
       if (!isNaN(d.getTime())) {
         return d.toISOString().split("T")[0];
       }
-    } catch {}
+    } catch {
+      return "";
+    }
     return "";
   };
 
-  const coinHistory = history
-    .filter(
-      (item) => item.coin === selectedCoin
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.timestamp) -
-        new Date(b.timestamp)
-    );
+  const coinHistory = useMemo(() => {
+    return history
+      .filter((item) => item.coin === selectedCoin)
+      .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  }, [history, selectedCoin]);
 
-  const availableDates = Array.from(
-    new Set(
-      coinHistory
-        .map((item) => getRecordDateKey(item.timestamp))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => b.localeCompare(a));
+  const availableDates = useMemo(() => {
+    return Array.from(
+      new Set(
+        coinHistory
+          .map((item) => getRecordDateKey(item.timestamp))
+          .filter(Boolean)
+      )
+    ).sort((a, b) => b.localeCompare(a));
+  }, [coinHistory]);
 
-  const filteredTableRecords = coinHistory.filter((item) => {
-    if (selectedHistoricalDate === "all" || !selectedHistoricalDate) return true;
-    return getRecordDateKey(item.timestamp) === selectedHistoricalDate;
-  });
+  const filteredTableRecords = useMemo(() => {
+    return coinHistory.filter((item) => {
+      if (selectedHistoricalDate === "all" || !selectedHistoricalDate) return true;
+      return getRecordDateKey(item.timestamp) === selectedHistoricalDate;
+    });
+  }, [coinHistory, selectedHistoricalDate]);
+
+  /* ============================================================
+     TABLE PAGINATION
+  ============================================================ */
+  const [tablePage, setTablePage] = useState(1);
+  const pageSize = 25;
+  const totalPages = Math.ceil(filteredTableRecords.length / pageSize) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (tablePage - 1) * pageSize;
+    return filteredTableRecords.slice(start, start + pageSize);
+  }, [filteredTableRecords, tablePage]);
 
 
   /* ============================================================
-     LINE CHART DATA
+     LINE CHART DATA (DOWNSAMPLED FOR SMOOTH RENDERING)
   ============================================================ */
 
-  const chartData = coinHistory.map((item) => ({
-    time: new Date(
-      item.timestamp
-    ).toLocaleTimeString(),
+  const chartData = useMemo(() => {
+    const raw = coinHistory.map((item) => ({
+      time: new Date(item.timestamp).toLocaleTimeString(),
+      price: Number(item.price),
+    }));
 
-    price: Number(item.price),
-  }));
+    if (raw.length <= 150) return raw;
+
+    const step = Math.ceil(raw.length / 120);
+    const sampled = [];
+    for (let i = 0; i < raw.length; i += step) {
+      sampled.push(raw[i]);
+    }
+    if (raw.length > 0 && sampled[sampled.length - 1] !== raw[raw.length - 1]) {
+      sampled.push(raw[raw.length - 1]);
+    }
+    return sampled;
+  }, [coinHistory]);
 
 
   /* ============================================================
      STATISTICS
   ============================================================ */
 
-  const prices = coinHistory.map((item) =>
-    Number(item.price)
-  );
+  const prices = useMemo(() => {
+    return coinHistory.map((item) => Number(item.price));
+  }, [coinHistory]);
 
+  const latestPrice = useMemo(() => {
+    return prices.length > 0 ? prices[prices.length - 1] : null;
+  }, [prices]);
 
-  const latestPrice =
-    prices.length > 0
-      ? prices[prices.length - 1]
-      : null;
+  const highestPrice = useMemo(() => {
+    return prices.length > 0 ? Math.max(...prices) : null;
+  }, [prices]);
 
-
-  const highestPrice =
-    prices.length > 0
-      ? Math.max(...prices)
-      : null;
-
-
-  const lowestPrice =
-    prices.length > 0
-      ? Math.min(...prices)
-      : null;
+  const lowestPrice = useMemo(() => {
+    return prices.length > 0 ? Math.min(...prices) : null;
+  }, [prices]);
 
 
   /* ============================================================
@@ -846,11 +861,11 @@ function Analytics() {
         <select
           className="analytics-select"
           value={selectedCoin}
-          onChange={(e) =>
-            setSelectedCoin(
-              e.target.value
-            )
-          }
+          onChange={(e) => {
+            setSelectedCoin(e.target.value);
+            setSelectedHistoricalDate("all");
+            setTablePage(1);
+          }}
           style={{
             ...styles.select,
             colorScheme: isDark ? "dark" : "light",
@@ -1806,14 +1821,16 @@ function Analytics() {
                     All Dates ({availableDates.length})
                   </option>
                   {availableDates.map((dateStr) => {
-                    let formatted = dateStr;
+                    let formatted;
                     try {
                       formatted = new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",
                         day: "numeric",
                       });
-                    } catch {}
+                    } catch {
+                      formatted = dateStr;
+                    }
                     return (
                       <option
                         key={dateStr}
@@ -1843,90 +1860,134 @@ function Analytics() {
                   : "No historical records found for this date."}
               </p>
             ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th
-                      style={{
-                        ...styles.th,
-                        color: colors.title,
-                        borderBottom: `2px solid ${colors.border}`,
-                      }}
-                    >
-                      Coin
-                    </th>
-                    <th
-                      style={{
-                        ...styles.th,
-                        color: colors.title,
-                        borderBottom: `2px solid ${colors.border}`,
-                      }}
-                    >
-                      Price
-                    </th>
-                    <th
-                      style={{
-                        ...styles.th,
-                        color: colors.title,
-                        borderBottom: `2px solid ${colors.border}`,
-                      }}
-                    >
-                      Currency
-                    </th>
-                    <th
-                      style={{
-                        ...styles.th,
-                        color: colors.title,
-                        borderBottom: `2px solid ${colors.border}`,
-                      }}
-                    >
-                      Timestamp
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTableRecords.map((item, index) => (
-                    <tr key={index}>
-                      <td
+              <>
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th
                         style={{
-                          ...styles.td,
-                          color: colors.text,
-                          borderBottom: `1px solid ${colors.border}`,
+                          ...styles.th,
+                          color: colors.title,
+                          borderBottom: `2px solid ${colors.border}`,
                         }}
                       >
-                        {item.coin}
-                      </td>
-                      <td
+                        Coin
+                      </th>
+                      <th
                         style={{
-                          ...styles.td,
-                          color: colors.text,
-                          borderBottom: `1px solid ${colors.border}`,
+                          ...styles.th,
+                          color: colors.title,
+                          borderBottom: `2px solid ${colors.border}`,
                         }}
                       >
-                        ${formatPrice(item.price)}
-                      </td>
-                      <td
+                        Price
+                      </th>
+                      <th
                         style={{
-                          ...styles.td,
-                          color: colors.text,
-                          borderBottom: `1px solid ${colors.border}`,
+                          ...styles.th,
+                          color: colors.title,
+                          borderBottom: `2px solid ${colors.border}`,
                         }}
                       >
-                        {item.currency ? item.currency.toUpperCase() : "USD"}
-                      </td>
-                      <td
+                        Currency
+                      </th>
+                      <th
                         style={{
-                          ...styles.td,
-                          color: colors.text,
-                          borderBottom: `1px solid ${colors.border}`,
+                          ...styles.th,
+                          color: colors.title,
+                          borderBottom: `2px solid ${colors.border}`,
                         }}
                       >
-                        {new Date(item.timestamp).toLocaleString()}
-                      </td>
+                        Timestamp
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {paginatedRecords.map((item, index) => (
+                      <tr key={index}>
+                        <td
+                          style={{
+                            ...styles.td,
+                            color: colors.text,
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                        >
+                          {item.coin}
+                        </td>
+                        <td
+                          style={{
+                            ...styles.td,
+                            color: colors.text,
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                        >
+                          ${formatPrice(item.price)}
+                        </td>
+                        <td
+                          style={{
+                            ...styles.td,
+                            color: colors.text,
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                        >
+                          {item.currency ? item.currency.toUpperCase() : "USD"}
+                        </td>
+                        <td
+                          style={{
+                            ...styles.td,
+                            color: colors.text,
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                        >
+                          {new Date(item.timestamp).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px", padding: "8px 4px", fontSize: "0.85rem", color: colors.muted }}>
+                    <span>Showing {(tablePage - 1) * pageSize + 1} to {Math.min(tablePage * pageSize, filteredTableRecords.length)} of {filteredTableRecords.length} records</span>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        type="button"
+                        onClick={() => setTablePage((p) => Math.max(1, p - 1))}
+                        disabled={tablePage === 1}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.input,
+                          color: colors.title,
+                          cursor: tablePage === 1 ? "not-allowed" : "pointer",
+                          opacity: tablePage === 1 ? 0.5 : 1,
+                        }}
+                      >
+                        ← Previous
+                      </button>
+                      <span style={{ padding: "6px 10px", alignSelf: "center", fontWeight: "600", color: colors.title }}>
+                        {tablePage} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setTablePage((p) => Math.min(totalPages, p + 1))}
+                        disabled={tablePage === totalPages}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: "6px",
+                          border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.input,
+                          color: colors.title,
+                          cursor: tablePage === totalPages ? "not-allowed" : "pointer",
+                          opacity: tablePage === totalPages ? 0.5 : 1,
+                        }}
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
           </div>

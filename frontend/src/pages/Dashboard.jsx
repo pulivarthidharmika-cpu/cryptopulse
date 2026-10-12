@@ -30,9 +30,6 @@ function Dashboard() {
 
   const fetchPrices = async () => {
     try {
-      setLoading(true);
-      setError("");
-
       const response = await fetch(`${BASE_URL}/prices/latest`);
 
       if (!response.ok) {
@@ -44,6 +41,7 @@ function Dashboard() {
       console.log("Latest prices:", result);
 
       setPrices(result.data || []);
+      setError("");
     } catch (err) {
       console.error("Price fetch error:", err);
       setError("Unable to load cryptocurrency prices.");
@@ -75,7 +73,6 @@ function Dashboard() {
 
   const fetchHeatmap = async () => {
     try {
-      setHeatmapLoading(true);
       const response = await fetch(`${BASE_URL}/analytics/heatmap`);
 
       if (!response.ok) {
@@ -103,6 +100,8 @@ function Dashboard() {
   };
 
   const handleRefresh = () => {
+    setLoading(true);
+    setHeatmapLoading(true);
     fetchPrices();
     fetchGainersAndLosers();
     fetchHeatmap();
@@ -110,10 +109,13 @@ function Dashboard() {
   };
 
  useEffect(() => {
-  fetchPrices();
-  fetchGainersAndLosers();
-  fetchHeatmap();
-  fetchMarketIntelligence();
+  const loadInitialData = async () => {
+    fetchPrices();
+    fetchGainersAndLosers();
+    fetchHeatmap();
+    fetchMarketIntelligence();
+  };
+  loadInitialData();
 
   const interval = setInterval(() => {
     fetchPrices();
@@ -163,7 +165,7 @@ function Dashboard() {
             const newChange = data.change_24h !== undefined ? Number(data.change_24h) : item.change_24h;
             const newVolume = data.volume !== undefined ? Number(data.volume) : item.volume_24h;
 
-            let heatColor = item.heat_color;
+            let heatColor;
             if (newChange >= 5.0) heatColor = "#15803d";
             else if (newChange >= 2.0) heatColor = "#22c55e";
             else if (newChange > 0.0) heatColor = "#86efac";
