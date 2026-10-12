@@ -1127,6 +1127,37 @@ async def get_comparative_analytics(limit: int = 60, coins: Optional[str] = None
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def normalize_timestamp_val(val) -> tuple[datetime, str]:
+    """Helper to convert datetime or string timestamp to (datetime_obj, canonical_iso_str)."""
+    if isinstance(val, datetime):
+        return val, val.isoformat()
+    if isinstance(val, str):
+        cleaned = val.strip().replace("Z", "")
+        try:
+            return datetime.fromisoformat(cleaned), cleaned
+        except Exception:
+            pass
+        for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                dt = datetime.strptime(cleaned, fmt)
+                return dt, dt.isoformat()
+            except Exception:
+                pass
+        try:
+            dt = datetime.utcfromtimestamp(float(cleaned))
+            return dt, dt.isoformat()
+        except Exception:
+            pass
+    elif isinstance(val, (int, float)):
+        try:
+            dt = datetime.utcfromtimestamp(float(val))
+            return dt, dt.isoformat()
+        except Exception:
+            pass
+    now = datetime.utcnow()
+    return now, now.isoformat()
+
+
 # ==================================================
 # DEDICATED MULTI-COIN COMPARISON API
 # GET /analytics/comparison
@@ -1175,7 +1206,7 @@ async def get_comparison_data(
         # Fetch historical series for each coin
         series_by_coin = {}
         metrics_by_coin = []
-        all_timestamps = set()
+        all_timestamps = {}
 
         for coin in unique_coins:
             meta = meta_map.get(coin, {"name": coin.capitalize(), "symbol": coin[:4].upper()})
@@ -1188,9 +1219,11 @@ async def get_comparison_data(
 
             docs = []
             async for d in cursor:
-                if d.get("price") is not None and d.get("timestamp"):
+                if d.get("price") is not None and d.get("timestamp") is not None:
+                    dt_val, iso_val = normalize_timestamp_val(d["timestamp"])
+                    d["_canonical_ts"] = iso_val
                     docs.append(d)
-                    all_timestamps.add(d["timestamp"])
+                    all_timestamps[iso_val] = dt_val
             docs.reverse()
             series_by_coin[coin] = docs
 
@@ -1211,6 +1244,9 @@ async def get_comparison_data(
                 if start_price > 0:
                     period_return = round(((end_price - start_price) / start_price) * 100, 2)
 
+            data_ts_raw = live_doc.get("timestamp") or (docs[-1].get("timestamp") if docs else None)
+            data_ts_str = str(data_ts_raw) if data_ts_raw is not None else None
+
             metrics_by_coin.append({
                 "coin": coin,
                 "name": meta.get("name") or coin.capitalize(),
@@ -1222,11 +1258,11 @@ async def get_comparison_data(
                 "period_return_pct": period_return,
                 "start_price": start_price,
                 "data_points": len(docs),
-                "data_timestamp": live_doc.get("timestamp") or (docs[-1].get("timestamp") if docs else None),
+                "data_timestamp": data_ts_str,
             })
 
         # Build chronologically aligned normalized comparison series
-        sorted_timestamps = sorted(list(all_timestamps))
+        sorted_timestamps = sorted(all_timestamps.keys(), key=lambda k: all_timestamps[k])
         normalized_series = []
 
         base_prices = {}
@@ -1235,16 +1271,17 @@ async def get_comparison_data(
                 base_prices[coin] = float(docs[0]["price"])
 
         price_lookup = {
-            coin: {d["timestamp"]: float(d["price"]) for d in docs}
+            coin: {d["_canonical_ts"]: float(d["price"]) for d in docs}
             for coin, docs in series_by_coin.items()
         }
 
         last_known = {coin: base_prices.get(coin) for coin in unique_coins}
 
         for ts in sorted_timestamps:
+            dt_obj = all_timestamps[ts]
             point = {
                 "timestamp": ts,
-                "time": str(ts)[11:19] if "T" in str(ts) else str(ts)[-8:],
+                "time": dt_obj.strftime("%H:%M:%S"),
             }
             for coin in unique_coins:
                 if ts in price_lookup[coin]:

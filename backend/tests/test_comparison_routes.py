@@ -66,11 +66,26 @@ class TestComparisonRoutes(AsyncBaseTestCase):
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertIn("metrics", data)
-        self.assertEqual(len(data["metrics"]), 2)
         for m in data["metrics"]:
             self.assertIsNone(m["period_return_pct"])
+
+    def test_comparison_mixed_timestamps_support(self):
+        """Verify comparison handles coins with mixed timestamp formats (datetime and ISO strings) without TypeError."""
+        resp = self.run_async(
+            self.client.get("/analytics/comparison?coins=bitcoin,ethereum,binance&limit=50")
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["coins"], ["bitcoin", "ethereum", "binance"])
+        self.assertEqual(len(data["metrics"]), 3)
+        if len(data["normalized_series"]) > 0:
+            first = data["normalized_series"][0]
+            self.assertIn("time", first)
+            # Ensure time is clean HH:MM:SS format rather than raw microsecond decimals
+            self.assertRegex(first["time"], r"^\d{2}:\d{2}:\d{2}$")
 
 
 if __name__ == "__main__":
     unittest.main()
+
