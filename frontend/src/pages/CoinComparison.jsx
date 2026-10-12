@@ -70,13 +70,28 @@ function CoinComparison() {
 
   // Load available active coins from backend configuration
   useEffect(() => {
+    let isMounted = true;
     const loadCoins = async () => {
       try {
         const res = await fetch(`${BASE_URL}/prices/coins`);
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data.coins) && data.coins.length > 0) {
-            setAvailableCoins(data.coins);
+          const detailsList = Array.isArray(data.details) ? data.details : [];
+          const coinsList = Array.isArray(data.coins) ? data.coins : [];
+
+          const mergedList = (coinsList.length > 0 ? coinsList : detailsList).map((c) => {
+            const slug = (typeof c === "string" ? c : c?.coin || "").toLowerCase();
+            const detail = detailsList.find((d) => (d.coin || "").toLowerCase() === slug);
+            return {
+              coin: slug,
+              name: detail?.name || (typeof c === "object" && c?.name) || (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : ""),
+              symbol: detail?.symbol || (typeof c === "object" && c?.symbol) || (slug ? slug.slice(0, 4).toUpperCase() : ""),
+              active: detail?.active !== undefined ? detail.active : true,
+            };
+          }).filter((c) => c.coin && c.active !== false);
+
+          if (isMounted && mergedList.length > 0) {
+            setAvailableCoins(mergedList);
           }
         }
       } catch (err) {
@@ -84,10 +99,13 @@ function CoinComparison() {
       }
     };
     loadCoins();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Fetch comparative data from /analytics/comparison
-  const fetchComparison = useCallback(async () => {
+  const fetchComparison = useCallback(async (abortSignal) => {
     if (selectedCoins.length < 2) {
       setComparisonData(null);
       setError("Please select at least 2 cryptocurrencies to compare.");
@@ -101,7 +119,8 @@ function CoinComparison() {
 
       const coinsParam = encodeURIComponent(selectedCoins.join(","));
       const res = await fetch(
-        `${BASE_URL}/analytics/comparison?coins=${coinsParam}&limit=${timeframeLimit}`
+        `${BASE_URL}/analytics/comparison?coins=${coinsParam}&limit=${timeframeLimit}`,
+        { signal: abortSignal }
       );
 
       const json = await res.json();
@@ -113,6 +132,9 @@ function CoinComparison() {
       setComparisonData(json);
       setLastUpdated(new Date().toLocaleTimeString());
     } catch (err) {
+      if (err.name === "AbortError") {
+        return;
+      }
       console.error("Comparison fetch error:", err);
       setError(err.message || "Failed to load coin comparison data.");
     } finally {
@@ -121,31 +143,41 @@ function CoinComparison() {
   }, [selectedCoins, timeframeLimit]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const load = async () => {
-      await fetchComparison();
+      await fetchComparison(controller.signal);
     };
     load();
+    return () => {
+      controller.abort();
+    };
   }, [fetchComparison]);
 
   // Coin selection handlers
   const handleToggleCoin = (coinId) => {
-    if (selectedCoins.includes(coinId)) {
+    const slug = (coinId || "").toString().toLowerCase();
+    if (!slug) return;
+
+    if (selectedCoins.map((s) => s.toLowerCase()).includes(slug)) {
       if (selectedCoins.length <= 2) {
         setError("At least 2 coins are required for comparison.");
         return;
       }
-      setSelectedCoins((prev) => prev.filter((c) => c !== coinId));
+      setError("");
+      setSelectedCoins((prev) => prev.filter((c) => c.toLowerCase() !== slug));
     } else {
       if (selectedCoins.length >= 5) {
         setError("Maximum 5 coins can be compared simultaneously.");
         return;
       }
-      setSelectedCoins((prev) => [...prev, coinId]);
+      setError("");
+      setSelectedCoins((prev) => [...prev, slug]);
     }
   };
 
   const getCoinColor = (coinId, index) => {
-    return COIN_FIXED_COLORS[coinId.toLowerCase()] || COIN_PALETTE[index % COIN_PALETTE.length];
+    const safeId = (coinId || "").toString().toLowerCase();
+    return COIN_FIXED_COLORS[safeId] || COIN_PALETTE[index % COIN_PALETTE.length];
   };
 
   // Format currency numbers
@@ -323,9 +355,12 @@ function CoinComparison() {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
           {selectedCoins.map((coinId, idx) => {
             const coinColor = getCoinColor(coinId, idx);
-            const coinInfo = availableCoins.find((c) => c.coin.toLowerCase() === coinId.toLowerCase());
-            const symbol = coinInfo?.symbol || coinId.toUpperCase();
-            const displayName = coinInfo?.name || coinId.charAt(0).toUpperCase() + coinId.slice(1);
+            const coinInfo = availableCoins.find((c) => {
+              const slug = typeof c === "string" ? c : c?.coin;
+              return slug && slug.toLowerCase() === coinId.toLowerCase();
+            });
+            const symbol = (typeof coinInfo === "object" && coinInfo?.symbol) || coinId.slice(0, 4).toUpperCase();
+            const displayName = (typeof coinInfo === "object" && coinInfo?.name) || (coinId.charAt(0).toUpperCase() + coinId.slice(1));
 
             return (
               <div
@@ -379,32 +414,46 @@ function CoinComparison() {
           <span style={{ fontSize: "0.8rem", color: colors.muted, marginRight: "6px" }}>
             Add supported asset:
           </span>
-          {availableCoins
-            .filter((c) => !selectedCoins.includes(c.coin.toLowerCase()))
-            .map((c) => (
-              <button
-                key={c.coin}
-                type="button"
-                onClick={() => handleToggleCoin(c.coin.toLowerCase())}
-                disabled={selectedCoins.length >= 5}
-                style={{
-                  padding: "4px 10px",
-                  fontSize: "0.8rem",
-                  borderRadius: "16px",
-                  border: `1px dashed ${colors.border}`,
-                  backgroundColor: colors.inputBg,
-                  color: selectedCoins.length >= 5 ? colors.muted : colors.text,
-                  cursor: selectedCoins.length >= 5 ? "not-allowed" : "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                <span>+</span>
-                <span>{c.name || c.coin}</span>
-                <span style={{ fontSize: "0.7rem", color: colors.muted }}>({c.symbol})</span>
-              </button>
-            ))}
+          {availableCoins.length === 0 ? (
+            <span style={{ fontSize: "0.8rem", color: colors.muted }}>
+              Loading active coins...
+            </span>
+          ) : (
+            availableCoins
+              .filter((c) => {
+                const slug = (typeof c === "string" ? c : c?.coin || "").toLowerCase();
+                return slug && !selectedCoins.map((s) => s.toLowerCase()).includes(slug);
+              })
+              .map((c) => {
+                const slug = (typeof c === "string" ? c : c?.coin || "").toLowerCase();
+                const name = (typeof c === "object" && c?.name) || (slug.charAt(0).toUpperCase() + slug.slice(1));
+                const symbol = (typeof c === "object" && c?.symbol) || slug.slice(0, 4).toUpperCase();
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => handleToggleCoin(slug)}
+                    disabled={selectedCoins.length >= 5}
+                    style={{
+                      padding: "4px 10px",
+                      fontSize: "0.8rem",
+                      borderRadius: "16px",
+                      border: `1px dashed ${colors.border}`,
+                      backgroundColor: colors.inputBg,
+                      color: selectedCoins.length >= 5 ? colors.muted : colors.text,
+                      cursor: selectedCoins.length >= 5 ? "not-allowed" : "pointer",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <span>+</span>
+                    <span>{name}</span>
+                    <span style={{ fontSize: "0.7rem", color: colors.muted }}>({symbol})</span>
+                  </button>
+                );
+              })
+          )}
         </div>
       </div>
 
@@ -421,11 +470,32 @@ function CoinComparison() {
             fontSize: "0.9rem",
             display: "flex",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: "8px",
+            flexWrap: "wrap",
           }}
         >
-          <span>⚠</span>
-          <span>{error}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span>⚠</span>
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => fetchComparison()}
+            disabled={loading}
+            style={{
+              padding: "4px 12px",
+              backgroundColor: "transparent",
+              border: `1px solid ${colors.danger}`,
+              color: colors.danger,
+              borderRadius: "6px",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -507,6 +577,7 @@ function CoinComparison() {
                     strokeWidth={2.5}
                     dot={false}
                     activeDot={{ r: 5 }}
+                    connectNulls={true}
                   />
                 ))}
               </LineChart>
@@ -555,13 +626,14 @@ function CoinComparison() {
               </tr>
             ) : (
               comparisonData.metrics.map((m, idx) => {
-                const coinColor = getCoinColor(m.coin, idx);
+                const coinSlug = (m.coin || m.name || "").toString().toLowerCase();
+                const coinColor = getCoinColor(coinSlug, idx);
                 const change24h = m.change_24h !== null && m.change_24h !== undefined ? Number(m.change_24h) : null;
                 const periodReturn = m.period_return_pct !== null && m.period_return_pct !== undefined ? Number(m.period_return_pct) : null;
 
                 return (
                   <tr
-                    key={m.coin}
+                    key={m.coin || idx}
                     style={{
                       borderBottom: `1px solid ${colors.border}`,
                     }}
@@ -582,11 +654,11 @@ function CoinComparison() {
                             fontSize: "0.85rem",
                           }}
                         >
-                          {m.symbol ? m.symbol.slice(0, 3) : m.coin.slice(0, 2).toUpperCase()}
+                          {m.symbol ? m.symbol.slice(0, 3) : coinSlug.slice(0, 2).toUpperCase()}
                         </div>
                         <div>
-                          <div style={{ fontWeight: "600" }}>{m.name || m.coin}</div>
-                          <div style={{ fontSize: "0.75rem", color: colors.muted }}>{m.symbol || m.coin.toUpperCase()}</div>
+                          <div style={{ fontWeight: "600" }}>{m.name || coinSlug.charAt(0).toUpperCase() + coinSlug.slice(1)}</div>
+                          <div style={{ fontSize: "0.75rem", color: colors.muted }}>{m.symbol || coinSlug.slice(0, 4).toUpperCase()}</div>
                         </div>
                       </div>
                     </td>
@@ -645,7 +717,7 @@ function CoinComparison() {
 
                     {/* History Count */}
                     <td style={{ padding: "14px 12px", color: colors.muted, fontSize: "0.85rem" }}>
-                      {m.history_count !== undefined ? `${m.history_count} snapshots` : "—"}
+                      {m.data_points !== undefined ? `${m.data_points} snapshots` : (m.history_count !== undefined ? `${m.history_count} snapshots` : "—")}
                     </td>
                   </tr>
                 );
